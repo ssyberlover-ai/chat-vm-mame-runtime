@@ -12,6 +12,7 @@ page.on("console", message => consoleLines.push(`${message.type()}: ${message.te
 
 const result = {
   target_url: targetUrl,
+  interstitial_passed: false,
   page_loaded: false,
   dos_prompt: false,
   vm_ready: false,
@@ -28,8 +29,18 @@ try {
     waitUntil: "networkidle",
     timeout: 60000
   });
-  result.page_loaded = true;
 
+  const openPageLink = page.getByText("Open the page", { exact: true });
+  if (await openPageLink.count()) {
+    await Promise.all([
+      page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {}),
+      openPageLink.first().click()
+    ]);
+    result.interstitial_passed = true;
+  }
+
+  result.page_loaded = true;
+  await page.waitForSelector("#agree", { timeout: 60000 });
   await page.check("#agree");
   await page.click("#start");
 
