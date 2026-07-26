@@ -1,0 +1,102 @@
+name: Smoke test emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/index.html"
+      - "site/app.js"
+      - "site/styles.css"
+      - "site/manifest.webmanifest"
+      - "site/runtime/**"
+      - "site/bios/**"
+      - "site/images/**"
+      - "scripts/smoke_test.mjs"
+      - ".github/workflows/smoke-test.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smoke-test-emulator
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local static server
+        run: |
+          python3 -m http.server 8000 --directory site > /tmp/chat-vm-http.log 2>&1 &
+          echo $! > /tmp/chat-vm-http.pid
+          for attempt in $(seq 1 20); do
+            curl --fail --silent http://127.0.0.1:8000/index.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/chat-vm-http.log
+          exit 1
+
+      - name: Run browser launch test
+        id: browser_test
+        continue-on-error: true
+        run: node scripts/smoke_test.mjs
+
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-smoke-evidence
+          path: |
+            smoke-result.json
+            smoke-mame.png
+            smoke-failure.png
+            /tmp/chat-vm-http.log
+          if-no-files-found: ignore
+
+      - name: Record smoke result
+        if: always()
+        env:
+          TEST_OUTCOME: ${{ steps.browser_test.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          details = {}
+          result_path = Path("smoke-result.json")
+          if result_path.exists():
+              details = json.loads(result_path.read_text(encoding="utf-8"))
+          output = {
+              "result": os.environ["TEST_OUTCOME"],
+              "run_url": os.environ["RUN_URL"],
+              "details": details,
+          }
+          Path("smoke-status.json").write_text(
+              json.dumps(output, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add smoke-status.json
+          git commit -m "chore: record emulator smoke test result" || true
+          git push
+
+      - name: Fail workflow when browser test failed
+        if: steps.browser_test.outcome != 'success'
+        run: exit 1
