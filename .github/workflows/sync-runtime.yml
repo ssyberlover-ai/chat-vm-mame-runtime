@@ -1,0 +1,152 @@
+name: Sync runtime assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-runtime.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-runtime-assets
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y curl unzip
+
+      - name: Download and validate runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p runtime mame notices
+
+          V86_COMMIT="3f7360b301732983de0aef027d7b5abda7ce3b0d"
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent "chat-vm-mame-runtime/1.0" \
+            "https://raw.githubusercontent.com/Pixelsuft/v86-wasmless/${V86_COMMIT}/build/v86_all.js" \
+            --output runtime/v86_all.js
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent "chat-vm-mame-runtime/1.0" \
+            "https://raw.githubusercontent.com/Pixelsuft/v86-wasmless/${V86_COMMIT}/LICENSE" \
+            --output notices/V86-LICENSE.txt
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent "chat-vm-mame-runtime/1.0" \
+            "https://raw.githubusercontent.com/mamedev/historic-mame/mame037b14/readme.txt" \
+            --output notices/MAME-0.37b14-README.txt
+
+          download_mame() {
+            local destination="$1"
+            shift
+            local url temp
+
+            for url in "$@"; do
+              echo "Trying MAME source: ${url}"
+              temp="${destination}.part"
+              rm -f "${temp}"
+
+              if curl --fail --location --retry 3 --retry-all-errors \
+                --connect-timeout 20 --max-time 180 \
+                --user-agent "Mozilla/5.0 chat-vm-mame-runtime/1.0" \
+                "${url}" --output "${temp}"; then
+
+                if [[ "$(head -c 2 "${temp}" || true)" == "PK" ]] \
+                  && unzip -tqq "${temp}" \
+                  && unzip -Z1 "${temp}" | grep -Eiq '(^|/)mame\.exe$'; then
+                  mv "${temp}" "${destination}"
+                  echo "Validated MAME archive from ${url}"
+                  return 0
+                fi
+              fi
+
+              echo "Rejected invalid response from ${url}"
+            done
+
+            return 1
+          }
+
+          download_mame mame/m37b14b.zip \
+            "https://www.progettosnaps.net/MAME/bin/m37b14b.zip" \
+            "https://downloads.sourceforge.net/project/mame/mame/0.37b14/m37b14b.zip" \
+            "https://sourceforge.net/projects/mame/files/mame/0.37b14/m37b14b.zip/download"
+
+          test -s runtime/v86_all.js
+          test -s mame/m37b14b.zip
+          unzip -tqq mame/m37b14b.zip
+          unzip -Z1 mame/m37b14b.zip | grep -Eiq '(^|/)mame\.exe$'
+
+      - name: Generate manifest
+        shell: python
+        run: |
+          import hashlib
+          import json
+          from pathlib import Path
+
+          def record(path: str, source: str, version: str) -> dict:
+              data = Path(path).read_bytes()
+              return {
+                  "path": path,
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "source": source,
+                  "version": version,
+              }
+
+          manifest = {
+              "schema_version": 1,
+              "assets": {
+                  "v86": record(
+                      "runtime/v86_all.js",
+                      "https://github.com/Pixelsuft/v86-wasmless/tree/3f7360b301732983de0aef027d7b5abda7ce3b0d",
+                      "commit-3f7360b",
+                  ),
+                  "mame": record(
+                      "mame/m37b14b.zip",
+                      "https://www.mamedev.org/oldrel.html",
+                      "0.37b14-dos-original-archive",
+                  ),
+              },
+              "rom_policy": {
+                  "bundled_commercial_roms": False,
+                  "robby_roto_source": "https://www.mamedev.org/roms/robby/",
+              },
+              "source_code": {
+                  "mame_0_37b14": "https://github.com/mamedev/historic-mame/tree/mame037b14"
+              },
+          }
+
+          Path("manifest.json").write_text(
+              json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+
+      - name: Commit verified assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add runtime/v86_all.js mame/m37b14b.zip notices manifest.json
+
+          if git diff --cached --quiet; then
+            echo "Runtime assets are already current."
+            exit 0
+          fi
+
+          git commit -m "chore: sync verified VM runtime assets"
+          git push
