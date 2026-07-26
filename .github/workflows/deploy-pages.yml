@@ -6,12 +6,9 @@ on:
     branches: [main]
     paths:
       - "site/**"
-      - "scripts/build_mame_disk.py"
-      - "mame/m37b14b.zip"
+      - "scripts/smoke_test.mjs"
       - ".github/workflows/deploy-pages.yml"
-
-env:
-  V86_VERSION: "0.5.424"
+      - ".github/workflows/live-smoke.yml"
 
 permissions:
   contents: write
@@ -25,89 +22,25 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Fetch official v86 browser runtime
+      - name: Assemble playable site
         run: |
           set -euo pipefail
-          mkdir -p _generated/v86
-          V86_TARBALL=$(npm pack "v86@${V86_VERSION}" --pack-destination _generated --silent)
-          tar -xzf "_generated/${V86_TARBALL}" -C _generated/v86
-          test -s _generated/v86/package/build/libv86.js
-          test -s _generated/v86/package/build/v86.wasm
-          echo "v86 package: ${V86_TARBALL}"
-          sha256sum "_generated/${V86_TARBALL}"
-
-      - name: Fetch CWSDPMI runtime
-        run: |
-          set -euo pipefail
-          mkdir -p _generated
-          curl --fail --location --retry 4 --retry-all-errors \
-            https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.2/util/cwsdpmi.zip \
-            --output _generated/cwsdpmi.zip
-          python3 - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-
-          archive_path = Path("_generated/cwsdpmi.zip")
-          output_path = Path("_generated/CWSDPMI.EXE")
-
-          with ZipFile(archive_path) as archive:
-              candidates = [
-                  name for name in archive.namelist()
-                  if Path(name.replace("\\", "/")).name.upper() == "CWSDPMI.EXE"
-              ]
-              if not candidates:
-                  raise RuntimeError("CWSDPMI.EXE was not found in the FreeDOS package")
-              output_path.write_bytes(archive.read(candidates[0]))
-
-          if output_path.stat().st_size < 1024:
-              raise RuntimeError("CWSDPMI.EXE is unexpectedly small")
-          print(f"Extracted {output_path}: {output_path.stat().st_size} bytes")
-          PY
-
-      - name: Build MAME data disk
-        run: |
-          set -euo pipefail
-          python3 scripts/build_mame_disk.py \
-            --zip mame/m37b14b.zip \
-            --extra-file CWSDPMI.EXE=_generated/CWSDPMI.EXE \
-            --output _generated/mame-hda.img \
-            --gzip-output _generated/mame-hda.img.gz \
-            --size-mib 32
-
-      - name: Assemble same-origin site
-        run: |
-          set -euo pipefail
-          mkdir -p _site/runtime _site/bios _site/images
-          cp site/index.html site/emulator-v2.js site/styles.css site/manifest.webmanifest _site/
-          cp _generated/v86/package/build/libv86.js _site/runtime/
-          cp _generated/v86/package/build/v86.wasm _site/runtime/
-          cp _generated/mame-hda.img _generated/mame-hda.img.gz _site/images/
-          curl --fail --location --retry 4 --retry-all-errors \
-            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/seabios.bin \
-            --output _site/bios/seabios.bin
-          curl --fail --location --retry 4 --retry-all-errors \
-            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/vgabios.bin \
-            --output _site/bios/vgabios.bin
-          curl --fail --location --retry 4 --retry-all-errors \
-            https://raw.githubusercontent.com/copy/images/master/freedos722.img \
-            --output _site/images/freedos722.img
+          mkdir -p _site
+          cp site/index.html _site/index.html
+          if [ -f site/manifest.webmanifest ]; then
+            cp site/manifest.webmanifest _site/manifest.webmanifest
+          fi
           touch _site/.nojekyll
 
-          test -s _site/runtime/libv86.js
-          test -s _site/runtime/v86.wasm
-          test -s _site/emulator-v2.js
-          test -s _site/images/mame-hda.img.gz
-          test -s _site/images/freedos722.img
-          grep -Fq './runtime/libv86.js' _site/index.html
-          grep -Fq './emulator-v2.js' _site/index.html
-
-      - name: Validate JavaScript
-        run: node --check _site/emulator-v2.js
+          test -s _site/index.html
+          grep -Fq 'EJS_core = "mame2003"' _site/index.html
+          grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' _site/index.html
+          grep -Fq 'Robby Roto 시작' _site/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -135,36 +68,19 @@ jobs:
     needs: deploy
     timeout-minutes: 5
     steps:
-      - name: Verify deployed page and required assets
+      - name: Verify deployed page
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
           set -euo pipefail
-          BASE_URL="${PAGE_URL%/}/"
-
-          fetch_asset() {
-            local path="$1"
-            local output="$2"
-            curl --fail --location --silent --show-error \
-              --retry 12 --retry-delay 5 --retry-all-errors \
-              "${BASE_URL}${path}" --output "${output}"
-            test -s "${output}"
-          }
-
-          fetch_asset "" /tmp/index.html
-          fetch_asset "emulator-v2.js" /tmp/emulator-v2.js
-          fetch_asset "runtime/libv86.js" /tmp/libv86.js
-          fetch_asset "runtime/v86.wasm" /tmp/v86.wasm
-          fetch_asset "bios/seabios.bin" /tmp/seabios.bin
-          fetch_asset "bios/vgabios.bin" /tmp/vgabios.bin
-          fetch_asset "images/freedos722.img" /tmp/freedos722.img
-          fetch_asset "images/mame-hda.img.gz" /tmp/mame-hda.img.gz
-
-          grep -Fq './runtime/libv86.js' /tmp/index.html
-          grep -Fq './emulator-v2.js' /tmp/index.html
-          test "$(wc -c < /tmp/libv86.js)" -gt 100000
-          test "$(wc -c < /tmp/v86.wasm)" -gt 100000
-          echo "Live smoke test passed: ${BASE_URL}"
+          URL="${PAGE_URL%/}/?deploy=${GITHUB_SHA}"
+          curl --fail --location --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors \
+            "$URL" --output /tmp/index.html
+          test -s /tmp/index.html
+          grep -Fq 'EJS_core = "mame2003"' /tmp/index.html
+          grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' /tmp/index.html
+          echo "Playable page published: $URL"
 
   report:
     if: always()
@@ -205,7 +121,7 @@ jobs:
           PY
 
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "4189823+github-actions[bot]@users.noreply.github.com"
           git add deployment-status.json
           if git diff --cached --quiet; then
             exit 0
