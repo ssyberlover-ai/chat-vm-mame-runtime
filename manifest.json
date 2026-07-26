@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "assets": {
+    "v86": {
+      "path": "runtime/v86_all.js",
+      "bytes": 278428,
+      "sha256": "f02aa2d79b27a9ef83737c38c28278dd5e71e9e6cbfb57b41df34fc4f8b45f7e",
+      "source": "https://github.com/Pixelsuft/v86-wasmless/tree/3f7360b301732983de0aef027d7b5abda7ce3b0d",
+      "version": "commit-3f7360b"
+    },
+    "mame": {
+      "path": "mame/m37b14b.zip",
+      "bytes": 2592228,
+      "sha256": "05277d1aa0cd94669a2b21188424fb57c99826ab23ab125f0e222dee84347eba",
+      "source": "https://www.mamedev.org/oldrel.html",
+      "version": "0.37b14-dos-original-archive"
+    }
+  },
+  "rom_policy": {
+    "bundled_commercial_roms": false,
+    "robby_roto_source": "https://www.mamedev.org/roms/robby/"
+  },
+  "source_code": {
+    "mame_0_37b14": "https://github.com/mamedev/historic-mame/tree/mame037b14"
+  }
+}
