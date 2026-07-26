@@ -2,17 +2,9 @@ name: Live smoke test emulator
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "site/index.html"
-      - "site/emulator-v2.js"
-      - "site/styles.css"
-      - "site/runtime/**"
-      - "site/bios/**"
-      - "site/images/**"
-      - "scripts/smoke_test.mjs"
-      - ".github/workflows/live-smoke.yml"
+  workflow_run:
+    workflows: ["Build and deploy emulator"]
+    types: [completed]
 
 permissions:
   contents: write
@@ -23,6 +15,7 @@ concurrency:
 
 jobs:
   smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -36,11 +29,11 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Run public-link browser test
+      - name: Run GitHub Pages browser test
         id: browser_test
         continue-on-error: true
         env:
-          SMOKE_URL: https://rawcdn.githack.com/${{ github.repository }}/${{ github.sha }}/site/index.html
+          SMOKE_URL: https://ssyberlover-ai.github.io/chat-vm-mame-runtime/
         run: node scripts/smoke_test.mjs
 
       - name: Upload live smoke evidence
@@ -60,8 +53,7 @@ jobs:
         env:
           TEST_OUTCOME: ${{ steps.browser_test.outcome }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PUBLIC_URL: https://rawcdn.githack.com/${{ github.repository }}/${{ github.sha }}/site/index.html
-          TESTED_URL: https://rawcdn.githack.com/${{ github.repository }}/${{ github.sha }}/site/index.html
+          PUBLIC_URL: https://ssyberlover-ai.github.io/chat-vm-mame-runtime/
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -81,7 +73,6 @@ jobs:
               "result": os.environ["TEST_OUTCOME"],
               "run_url": os.environ["RUN_URL"],
               "public_url": os.environ["PUBLIC_URL"],
-              "tested_url": os.environ["TESTED_URL"],
               "details": details,
           }
           Path("live-smoke-status.json").write_text(
