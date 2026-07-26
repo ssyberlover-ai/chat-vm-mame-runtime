@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-07-26T21:04:56.130281+00:00",
+  "assets": {
+    "site/runtime/v86_all.js": {
+      "bytes": 278428,
+      "sha256": "f02aa2d79b27a9ef83737c38c28278dd5e71e9e6cbfb57b41df34fc4f8b45f7e"
+    },
+    "site/bios/seabios.bin": {
+      "bytes": 131072,
+      "sha256": "73e3f359102e3a9982c35fce98eb7cd08f18303ac7f1ba6ebfbe6cdc1c244d98"
+    },
+    "site/bios/vgabios.bin": {
+      "bytes": 36352,
+      "sha256": "a4bc0d80cc3ca028c73dafa8fee396b8d054ce87ebd8abfbd31b06b437607880"
+    },
+    "site/images/freedos722.img": {
+      "bytes": 737280,
+      "sha256": "6c7b3c62823d538e20797fecae6dc55d2572455791a573a7de2cdba0b583f6be"
+    },
+    "site/images/mame-hda.img": {
+      "bytes": 33554432,
+      "sha256": "ab4858920372961d7e8199e28b2a6b44bcf5882cfe485a42c6451582388d2c04"
+    },
+    "site/images/mame-hda.img.gz": {
+      "bytes": 2635804,
+      "sha256": "bdf8bace99c2857d83b62f695f3fee36a2da983a70b054b749d5da144322ace4"
+    }
+  }
+}
