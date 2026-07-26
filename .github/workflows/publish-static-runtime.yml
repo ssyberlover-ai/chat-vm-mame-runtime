@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "site/index.html"
-      - "site/emulator.js"
+      - "site/emulator-v2.js"
       - "site/styles.css"
       - "site/manifest.webmanifest"
       - "scripts/build_mame_disk.py"
@@ -84,7 +84,7 @@ jobs:
             https://raw.githubusercontent.com/copy/images/master/freedos722.img \
             --output site/images/freedos722.img
 
-          node --check site/emulator.js
+          node --check site/emulator-v2.js
           test -s site/runtime/libv86.js
           test -s site/runtime/v86.wasm
           test -s site/bios/seabios.bin
@@ -120,6 +120,7 @@ jobs:
               json.dumps({
                   "generated_at": datetime.now(timezone.utc).isoformat(),
                   "v86_version": "0.5.424",
+                  "controller": "site/emulator-v2.js",
                   "dpmi": {
                       "name": "CWSDPMI.EXE",
                       "source": "DJGPP csdpmi7b.zip",
