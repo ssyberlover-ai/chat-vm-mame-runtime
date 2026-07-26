@@ -10,7 +10,6 @@ on:
       - "site/styles.css"
       - "site/manifest.webmanifest"
       - "scripts/build_mame_disk.py"
-      - "runtime/v86_all.js"
       - "mame/m37b14b.zip"
       - ".github/workflows/publish-static-runtime.yml"
 
@@ -35,7 +34,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p site/runtime site/bios site/images
-          cp runtime/v86_all.js site/runtime/v86_all.js
+          rm -f site/runtime/v86_all.js
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/Pixelsuft/v86-wasmless/3f7360b301732983de0aef027d7b5abda7ce3b0d/build/libv86.js \
+            --output site/runtime/libv86.js
 
           python3 scripts/build_mame_disk.py \
             --zip mame/m37b14b.zip \
@@ -54,7 +56,7 @@ jobs:
             --output site/images/freedos722.img
 
           node --check site/app.js
-          test -s site/runtime/v86_all.js
+          test -s site/runtime/libv86.js
           test -s site/bios/seabios.bin
           test -s site/bios/vgabios.bin
           test -s site/images/freedos722.img
@@ -69,7 +71,7 @@ jobs:
           from pathlib import Path
 
           paths = [
-              "site/runtime/v86_all.js",
+              "site/runtime/libv86.js",
               "site/bios/seabios.bin",
               "site/bios/vgabios.bin",
               "site/images/freedos722.img",
@@ -97,7 +99,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add site/runtime site/bios site/images site/runtime-manifest.json
+          git add -A site/runtime site/bios site/images site/runtime-manifest.json
           if git diff --cached --quiet; then
             echo "Static runtime assets are already current."
           else
