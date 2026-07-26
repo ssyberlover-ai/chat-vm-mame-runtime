@@ -33,7 +33,7 @@ jobs:
       - name: Build and collect runtime assets
         run: |
           set -euo pipefail
-          mkdir -p site/runtime site/bios site/images /tmp/v86-package
+          mkdir -p site/runtime site/bios site/images /tmp/v86-package /tmp/csdpmi
           rm -f site/runtime/v86_all.js site/runtime/libv86.js site/runtime/v86.wasm
 
           V86_VERSION="0.5.424"
@@ -42,8 +42,34 @@ jobs:
           cp /tmp/v86-package/package/build/libv86.js site/runtime/libv86.js
           cp /tmp/v86-package/package/build/v86.wasm site/runtime/v86.wasm
 
+          download_csdpmi() {
+            local destination="/tmp/csdpmi/csdpmi7b.zip"
+            local url
+            for url in \
+              "https://ftp.delorie.com/pub/djgpp/current/v2misc/csdpmi7b.zip" \
+              "https://ftp.gwdg.de/pub/msdos/gcc/djgpp/v2misc/csdpmi7b.zip"; do
+              if curl --fail --location --retry 3 --retry-all-errors \
+                --connect-timeout 20 --max-time 120 \
+                "${url}" --output "${destination}.part"; then
+                if unzip -tqq "${destination}.part"; then
+                  mv "${destination}.part" "${destination}"
+                  return 0
+                fi
+              fi
+              rm -f "${destination}.part"
+            done
+            return 1
+          }
+
+          download_csdpmi
+          CSDPMI_MEMBER="$(unzip -Z1 /tmp/csdpmi/csdpmi7b.zip | grep -Ei '(^|/)CWSDPMI\.EXE$' | head -n 1)"
+          test -n "${CSDPMI_MEMBER}"
+          unzip -p /tmp/csdpmi/csdpmi7b.zip "${CSDPMI_MEMBER}" > /tmp/csdpmi/CWSDPMI.EXE
+          test -s /tmp/csdpmi/CWSDPMI.EXE
+
           python3 scripts/build_mame_disk.py \
             --zip mame/m37b14b.zip \
+            --extra-file CWSDPMI.EXE=/tmp/csdpmi/CWSDPMI.EXE \
             --output site/images/mame-hda.img \
             --gzip-output site/images/mame-hda.img.gz \
             --size-mib 32
@@ -94,6 +120,11 @@ jobs:
               json.dumps({
                   "generated_at": datetime.now(timezone.utc).isoformat(),
                   "v86_version": "0.5.424",
+                  "dpmi": {
+                      "name": "CWSDPMI.EXE",
+                      "source": "DJGPP csdpmi7b.zip",
+                      "bundled_in": "site/images/mame-hda.img",
+                  },
                   "assets": assets,
               }, indent=2) + "\n",
               encoding="utf-8",
@@ -109,7 +140,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Static runtime assets are already current."
           else
-            git commit -m "chore: publish official v86 browser runtime"
+            git commit -m "chore: publish MAME runtime with CWSDPMI"
             git push
           fi
 
