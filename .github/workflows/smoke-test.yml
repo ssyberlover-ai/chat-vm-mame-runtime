@@ -12,6 +12,7 @@ on:
       - "site/runtime/**"
       - "site/bios/**"
       - "site/images/**"
+      - "site/runtime-manifest.json"
       - "scripts/smoke_test.mjs"
       - ".github/workflows/smoke-test.yml"
 
@@ -32,14 +33,16 @@ jobs:
         with:
           ref: main
 
-      - name: Verify official v86 assets
+      - name: Verify official v86 and DPMI assets
         run: |
           set -euo pipefail
           test -s site/runtime/libv86.js
           test -s site/runtime/v86.wasm
+          test -s site/images/mame-hda.img.gz
           grep -q 'runtime/libv86.js' site/index.html
           grep -q 'runtime/v86.wasm' site/emulator-v2.js
           grep -q 'boot_order: 0x321' site/emulator-v2.js
+          grep -q 'CWSDPMI.EXE' site/runtime-manifest.json
           node --check site/emulator-v2.js
 
       - name: Install Playwright Chromium
@@ -94,7 +97,7 @@ jobs:
           output = {
               "result": os.environ["TEST_OUTCOME"],
               "run_url": os.environ["RUN_URL"],
-              "runtime": "official-v86-0.5.424-wasm-v2",
+              "runtime": "official-v86-0.5.424-wasm-cwsdpmi",
               "details": details,
           }
           Path("smoke-status.json").write_text(
