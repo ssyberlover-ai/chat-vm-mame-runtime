@@ -1,6 +1,12 @@
 {
-  "generated_at": "2026-07-26T21:30:04.913894+00:00",
+  "generated_at": "2026-07-26T21:43:43.990440+00:00",
   "v86_version": "0.5.424",
+  "controller": "site/emulator-v2.js",
+  "dpmi": {
+    "name": "CWSDPMI.EXE",
+    "source": "DJGPP csdpmi7b.zip",
+    "bundled_in": "site/images/mame-hda.img"
+  },
   "assets": {
     "site/runtime/libv86.js": {
       "bytes": 353762,
@@ -24,11 +30,11 @@
     },
     "site/images/mame-hda.img": {
       "bytes": 33554432,
-      "sha256": "ab4858920372961d7e8199e28b2a6b44bcf5882cfe485a42c6451582388d2c04"
+      "sha256": "a8ed2b2d45dafa56bf4da1d8bd7e70d881e52e65cf25b8dd78dc1d8869d6d5ed"
     },
     "site/images/mame-hda.img.gz": {
-      "bytes": 2635804,
-      "sha256": "bdf8bace99c2857d83b62f695f3fee36a2da983a70b054b749d5da144322ace4"
+      "bytes": 2649685,
+      "sha256": "c561bacd1bfb9b5ce84f60348b98a5eaa2a715b04ccd8c5729ffeee09e3c94c3"
     }
   }
 }
