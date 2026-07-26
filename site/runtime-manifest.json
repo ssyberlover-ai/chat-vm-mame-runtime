@@ -1,9 +1,14 @@
 {
-  "generated_at": "2026-07-26T21:20:32.155939+00:00",
+  "generated_at": "2026-07-26T21:28:38.302580+00:00",
+  "v86_version": "0.5.424",
   "assets": {
     "site/runtime/libv86.js": {
-      "bytes": 581275,
-      "sha256": "18e41a8df3b0b3985161391483ecfde0d02029833156306c5fefae2f458d2da5"
+      "bytes": 353762,
+      "sha256": "b80fba71dacb7977e5b46800b3ba194bba7fe13e52fa3d22f80cc060ff015a4e"
+    },
+    "site/runtime/v86.wasm": {
+      "bytes": 2084417,
+      "sha256": "aec2c16bb0a1618aa641bb44d9c0fe14681f8c1459fa08c32e3e0562020884e8"
     },
     "site/bios/seabios.bin": {
       "bytes": 131072,
