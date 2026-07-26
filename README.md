@@ -1,55 +1,59 @@
 # chat-vm-mame-runtime
 
-Public runtime assets for running a FreeDOS + DOS MAME 0.37b14 virtual machine in a ChatGPT HTML Preview.
+Browser-hosted Robby Roto arcade runtime for desktop and mobile.
 
-## Scope
+## Current architecture
 
-This repository is intentionally separate from `ai-game-studio-os`.
+The published site no longer runs DOS MAME inside a v86/FreeDOS virtual machine. The active runtime is:
 
-It stores only:
+- GitHub Pages hosting
+- EmulatorJS `4.2.3`
+- Libretro `mame2003_plus` WebAssembly core
+- Canvas/WebGL game output
+- custom multitouch D-pad, FIRE, COIN, and START controls
 
-- a pinned JavaScript-only v86 runtime (`runtime/v86_all.js`)
-- the unmodified official DOS MAME 0.37b14 binary archive (`mame/m37b14b.zip`)
-- source, license, checksum, and provenance records
-- Preview integration code added after runtime validation
+Public page:
 
-It does **not** store commercial arcade ROMs, private user files, or AI Game Studio OS sources.
+- https://ssyberlover-ai.github.io/chat-vm-mame-runtime/
 
-## Automated asset sync
+## Why the architecture changed
 
-`.github/workflows/sync-runtime.yml` runs on its initial commit or by manual dispatch. It:
-
-1. downloads the pinned `v86-wasmless` runtime
-2. downloads the original DOS MAME 0.37b14 archive from known public mirrors
-3. rejects HTML/error responses and invalid ZIP files
-4. confirms that the archive contains `MAME.EXE`
-5. generates `manifest.json` with file sizes and SHA-256 hashes
-6. commits only verified assets back to `main`
-
-Expected generated files:
-
-```text
-runtime/v86_all.js
-mame/m37b14b.zip
-notices/V86-LICENSE.txt
-notices/MAME-0.37b14-README.txt
-manifest.json
-```
+The previous DOS MAME build booted successfully in v86, but its VGA output was corrupted in both tweaked VGA and tested VESA modes. The native WebAssembly core removes the DOS, FreeDOS, BIOS, virtual disk, and virtual VGA layers.
 
 ## ROM policy
 
-MAME requires ROM images supplied by a legally entitled user. Commercial ROM sets are not bundled here.
+No commercial arcade ROM set is bundled with the published site.
 
-Robby Roto is handled separately from the runtime and should be loaded only from the official MAMEdev distribution path under its stated non-commercial-use terms:
+Robby Roto is loaded from the official MAMEdev repository under the non-commercial-use terms stated by MAMEdev:
 
 - https://www.mamedev.org/roms/robby/
 
-## Upstream sources
+The launch page requires acknowledgement of those terms before starting the emulator.
 
-- v86-wasmless: https://github.com/Pixelsuft/v86-wasmless
-- MAME previous releases: https://www.mamedev.org/oldrel.html
-- MAME 0.37b14 source: https://github.com/mamedev/historic-mame/tree/mame037b14
+## Deployment and verification
 
-## Status
+`.github/workflows/deploy-pages.yml` publishes `site/index.html` to GitHub Pages.
 
-Runtime sync is considered complete only after `manifest.json`, `runtime/v86_all.js`, and `mame/m37b14b.zip` are present on `main` and their checksums are recorded.
+The browser smoke test verifies:
+
+1. the public page loads
+2. the `mame2003_plus` core starts
+3. a visible game canvas is created
+4. the mobile virtual gamepad is displayed
+5. FIRE, COIN, and START controls are visible
+6. COIN and START can receive touch input
+
+Results are recorded in:
+
+- `deployment-status.json`
+- `live-smoke-status.json`
+
+## Legacy files
+
+Some v86, FreeDOS, and DOS MAME assets may remain in the repository as migration history. They are not used by the current GitHub Pages deployment.
+
+## Upstream projects
+
+- EmulatorJS: https://github.com/EmulatorJS/EmulatorJS
+- MAME 2003 Plus: https://github.com/libretro/mame2003-plus-libretro
+- MAMEdev Robby Roto distribution: https://www.mamedev.org/roms/robby/
