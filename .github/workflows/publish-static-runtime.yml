@@ -1,0 +1,119 @@
+name: Publish static runtime assets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/index.html"
+      - "site/app.js"
+      - "site/styles.css"
+      - "site/manifest.webmanifest"
+      - "scripts/build_mame_disk.py"
+      - "runtime/v86_all.js"
+      - "mame/m37b14b.zip"
+      - ".github/workflows/publish-static-runtime.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-static-runtime
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Build and collect runtime assets
+        run: |
+          set -euo pipefail
+          mkdir -p site/runtime site/bios site/images
+          cp runtime/v86_all.js site/runtime/v86_all.js
+
+          python3 scripts/build_mame_disk.py \
+            --zip mame/m37b14b.zip \
+            --output site/images/mame-hda.img \
+            --gzip-output site/images/mame-hda.img.gz \
+            --size-mib 32
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/seabios.bin \
+            --output site/bios/seabios.bin
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/vgabios.bin \
+            --output site/bios/vgabios.bin
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/images/master/freedos722.img \
+            --output site/images/freedos722.img
+
+          node --check site/app.js
+          test -s site/runtime/v86_all.js
+          test -s site/bios/seabios.bin
+          test -s site/bios/vgabios.bin
+          test -s site/images/freedos722.img
+          test -s site/images/mame-hda.img.gz
+
+      - name: Record asset manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          paths = [
+              "site/runtime/v86_all.js",
+              "site/bios/seabios.bin",
+              "site/bios/vgabios.bin",
+              "site/images/freedos722.img",
+              "site/images/mame-hda.img",
+              "site/images/mame-hda.img.gz",
+          ]
+          assets = {}
+          for path in paths:
+              data = Path(path).read_bytes()
+              assets[path] = {
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              }
+          Path("site/runtime-manifest.json").write_text(
+              json.dumps({
+                  "generated_at": datetime.now(timezone.utc).isoformat(),
+                  "assets": assets,
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Commit generated assets
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/runtime site/bios site/images site/runtime-manifest.json
+          if git diff --cached --quiet; then
+            echo "Static runtime assets are already current."
+          else
+            git commit -m "chore: publish generated browser runtime assets"
+            git push
+          fi
+
+      - name: Record success
+        run: |
+          cat > publish-status.json <<JSON
+          {
+            "result": "success",
+            "run_url": "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+            "development_url": "https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/main/site/index.html"
+          }
+          JSON
+          git add publish-status.json
+          git commit -m "chore: record static runtime publication" || true
+          git push
