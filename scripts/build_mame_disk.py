@@ -150,12 +150,29 @@ def build_fat16(files: list[FileEntry], size_mib: int = 32) -> bytes:
     return bytes(disk)
 
 
+def parse_extra_file(value: str) -> tuple[str, Path]:
+    name, separator, source = value.partition("=")
+    if not separator or not name or not source:
+        raise argparse.ArgumentTypeError("--extra-file must be DOS_NAME=SOURCE_PATH")
+    source_path = Path(source)
+    if not source_path.is_file():
+        raise argparse.ArgumentTypeError(f"extra file does not exist: {source_path}")
+    return name, source_path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--zip", required=True, dest="zip_path")
     parser.add_argument("--output", required=True)
     parser.add_argument("--gzip-output", required=True)
     parser.add_argument("--size-mib", type=int, default=32)
+    parser.add_argument(
+        "--extra-file",
+        action="append",
+        type=parse_extra_file,
+        default=[],
+        metavar="DOS_NAME=SOURCE_PATH",
+    )
     args = parser.parse_args()
 
     selected: dict[str, bytes] = {}
@@ -169,6 +186,12 @@ def main() -> None:
 
     if "MAME.EXE" not in selected:
         raise RuntimeError("MAME.EXE was not found in the verified archive")
+
+    for dos_name, source_path in args.extra_file:
+        selected[dos_name.upper()] = source_path.read_bytes()
+
+    if "CWSDPMI.EXE" not in selected:
+        raise RuntimeError("CWSDPMI.EXE is required to run the DJGPP MAME binary")
 
     selected["PLAY.BAT"] = (
         b"@ECHO OFF\r\n"
