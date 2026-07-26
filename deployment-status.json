@@ -1,7 +1,7 @@
 {
-  "build": "failure",
-  "deploy": "skipped",
-  "page_url": "",
+  "build": "success",
+  "deploy": "success",
+  "page_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
   "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30222530260",
-  "recorded_at": "2026-07-26T22:08:46.143753+00:00"
+  "recorded_at": "2026-07-26T22:17:27.086647+00:00"
 }
