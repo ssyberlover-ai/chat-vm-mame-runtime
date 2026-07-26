@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "site/index.html"
-      - "site/emulator.js"
+      - "site/emulator-v2.js"
       - "site/styles.css"
       - "site/manifest.webmanifest"
       - "site/runtime/**"
@@ -34,9 +34,13 @@ jobs:
 
       - name: Verify official v86 assets
         run: |
+          set -euo pipefail
           test -s site/runtime/libv86.js
           test -s site/runtime/v86.wasm
-          grep -q 'runtime/v86.wasm' site/index.html
+          grep -q 'runtime/libv86.js' site/index.html
+          grep -q 'runtime/v86.wasm' site/emulator-v2.js
+          grep -q 'boot_order: 0x321' site/emulator-v2.js
+          node --check site/emulator-v2.js
 
       - name: Install Playwright Chromium
         run: |
@@ -90,7 +94,7 @@ jobs:
           output = {
               "result": os.environ["TEST_OUTCOME"],
               "run_url": os.environ["RUN_URL"],
-              "runtime": "official-v86-0.5.424-wasm",
+              "runtime": "official-v86-0.5.424-wasm-v2",
               "details": details,
           }
           Path("smoke-status.json").write_text(
