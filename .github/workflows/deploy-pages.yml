@@ -7,9 +7,11 @@ on:
     paths:
       - "site/**"
       - "scripts/build_mame_disk.py"
-      - "runtime/v86_all.js"
       - "mame/m37b14b.zip"
       - ".github/workflows/deploy-pages.yml"
+
+env:
+  V86_VERSION: "0.5.424"
 
 permissions:
   contents: write
@@ -27,6 +29,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Fetch official v86 browser runtime
+        run: |
+          set -euo pipefail
+          mkdir -p _generated/v86
+          V86_TARBALL=$(npm pack "v86@${V86_VERSION}" --pack-destination _generated --silent)
+          tar -xzf "_generated/${V86_TARBALL}" -C _generated/v86
+          test -s _generated/v86/package/build/libv86.js
+          test -s _generated/v86/package/build/v86.wasm
+          echo "v86 package: ${V86_TARBALL}"
+          sha256sum "_generated/${V86_TARBALL}"
 
       - name: Fetch CWSDPMI runtime
         run: |
@@ -70,8 +83,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site/runtime _site/bios _site/images
-          cp site/index.html site/app.js site/styles.css site/manifest.webmanifest _site/
-          cp runtime/v86_all.js _site/runtime/
+          cp site/index.html site/emulator-v2.js site/styles.css site/manifest.webmanifest _site/
+          cp _generated/v86/package/build/libv86.js _site/runtime/
+          cp _generated/v86/package/build/v86.wasm _site/runtime/
           cp _generated/mame-hda.img _generated/mame-hda.img.gz _site/images/
           curl --fail --location --retry 4 --retry-all-errors \
             https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/seabios.bin \
@@ -83,12 +97,17 @@ jobs:
             https://raw.githubusercontent.com/copy/images/master/freedos722.img \
             --output _site/images/freedos722.img
           touch _site/.nojekyll
-          test -s _site/runtime/v86_all.js
+
+          test -s _site/runtime/libv86.js
+          test -s _site/runtime/v86.wasm
+          test -s _site/emulator-v2.js
           test -s _site/images/mame-hda.img.gz
           test -s _site/images/freedos722.img
+          grep -Fq './runtime/libv86.js' _site/index.html
+          grep -Fq './emulator-v2.js' _site/index.html
 
       - name: Validate JavaScript
-        run: node --check _site/app.js
+        run: node --check _site/emulator-v2.js
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -111,10 +130,46 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  smoke:
+    runs-on: ubuntu-latest
+    needs: deploy
+    timeout-minutes: 5
+    steps:
+      - name: Verify deployed page and required assets
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${PAGE_URL%/}/"
+
+          fetch_asset() {
+            local path="$1"
+            local output="$2"
+            curl --fail --location --silent --show-error \
+              --retry 12 --retry-delay 5 --retry-all-errors \
+              "${BASE_URL}${path}" --output "${output}"
+            test -s "${output}"
+          }
+
+          fetch_asset "" /tmp/index.html
+          fetch_asset "emulator-v2.js" /tmp/emulator-v2.js
+          fetch_asset "runtime/libv86.js" /tmp/libv86.js
+          fetch_asset "runtime/v86.wasm" /tmp/v86.wasm
+          fetch_asset "bios/seabios.bin" /tmp/seabios.bin
+          fetch_asset "bios/vgabios.bin" /tmp/vgabios.bin
+          fetch_asset "images/freedos722.img" /tmp/freedos722.img
+          fetch_asset "images/mame-hda.img.gz" /tmp/mame-hda.img.gz
+
+          grep -Fq './runtime/libv86.js' /tmp/index.html
+          grep -Fq './emulator-v2.js' /tmp/index.html
+          test "$(wc -c < /tmp/libv86.js)" -gt 100000
+          test "$(wc -c < /tmp/v86.wasm)" -gt 100000
+          echo "Live smoke test passed: ${BASE_URL}"
+
   report:
     if: always()
     runs-on: ubuntu-latest
-    needs: [build, deploy]
+    needs: [build, deploy, smoke]
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -125,6 +180,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
+          SMOKE_RESULT: ${{ needs.smoke.result }}
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
@@ -137,6 +193,7 @@ jobs:
           data = {
               "build": os.environ["BUILD_RESULT"],
               "deploy": os.environ["DEPLOY_RESULT"],
+              "smoke": os.environ["SMOKE_RESULT"],
               "page_url": os.environ.get("PAGE_URL", ""),
               "run_url": os.environ["RUN_URL"],
               "recorded_at": datetime.now(timezone.utc).isoformat(),
