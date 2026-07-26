@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-07-26T21:10:23.866896+00:00",
+  "generated_at": "2026-07-26T21:11:07.056613+00:00",
   "assets": {
-    "site/runtime/v86_all.js": {
-      "bytes": 278428,
-      "sha256": "f02aa2d79b27a9ef83737c38c28278dd5e71e9e6cbfb57b41df34fc4f8b45f7e"
+    "site/runtime/libv86.js": {
+      "bytes": 581275,
+      "sha256": "18e41a8df3b0b3985161391483ecfde0d02029833156306c5fefae2f458d2da5"
     },
     "site/bios/seabios.bin": {
       "bytes": 131072,
