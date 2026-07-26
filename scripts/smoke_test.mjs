@@ -22,26 +22,53 @@ const result = {
   mode: "unknown",
   game_canvas: false,
   mobile_controls: false,
+  visible_control_labels: [],
   final_status: "",
   browser_errors: browserErrors,
   console: consoleLines
 };
 
+const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+function fatalBrowserErrors() {
+  return browserErrors.filter(message =>
+    !/Wake Lock permission request denied/i.test(message)
+  );
+}
+
+async function waitForArcadeCanvas(timeoutMs = 240000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const state = await page.evaluate(() => {
+      const canvas = [...document.querySelectorAll("#game canvas")]
+        .find(item => item.width > 0 && item.height > 0 && getComputedStyle(item).display !== "none");
+      const status = document.querySelector("#status")?.textContent || "";
+      const error = document.querySelector("#error")?.textContent || "";
+      return {
+        canvas: Boolean(canvas),
+        status,
+        error
+      };
+    });
+
+    if (state.error || state.status.includes("실행 실패")) {
+      throw new Error(state.error || state.status);
+    }
+    if (consoleLines.some(line => line.includes("Failed to start game"))) {
+      throw new Error("EmulatorJS core reported: Failed to start game");
+    }
+    if (state.canvas) return;
+    await sleep(400);
+  }
+  throw new Error("Timed out waiting for the WebAssembly MAME canvas");
+}
+
 async function testArcadePage() {
   result.mode = "web-mame";
   await page.click("#launch");
+  await waitForArcadeCanvas();
+  await page.waitForTimeout(10000);
 
-  await page.waitForFunction(() => {
-    const status = document.querySelector("#status")?.textContent || "";
-    const canvas = document.querySelector("#game canvas");
-    const error = document.querySelector("#error")?.textContent || "";
-    return status.includes("게임 실행 중") ||
-      Boolean(canvas && canvas.width > 0 && canvas.height > 0) ||
-      error.length > 0 ||
-      status.includes("실행 실패");
-  }, null, { timeout: 240000, polling: 300 });
-
-  await page.waitForTimeout(12000);
   result.final_status = await page.locator("#status").textContent();
   const errorText = await page.locator("#error").textContent();
   if (errorText || result.final_status.includes("실행 실패")) {
@@ -50,25 +77,53 @@ async function testArcadePage() {
 
   result.game_canvas = await page.evaluate(() => {
     const canvases = [...document.querySelectorAll("#game canvas")];
-    return canvases.some(canvas => canvas.width > 0 && canvas.height > 0 && getComputedStyle(canvas).display !== "none");
+    return canvases.some(canvas =>
+      canvas.width > 0 &&
+      canvas.height > 0 &&
+      getComputedStyle(canvas).display !== "none"
+    );
   });
   if (!result.game_canvas) {
     throw new Error("EmulatorJS game canvas was not detected");
   }
 
-  result.mobile_controls = await page.evaluate(() => {
-    const candidates = [...document.querySelectorAll("#game button, #game [class*='button'], #game [class*='control'], #game [class*='gamepad']")];
-    return candidates.some(element => {
-      const style = getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 20 && rect.height > 20;
-    });
+  result.visible_control_labels = await page.evaluate(() => {
+    const wanted = ["FIRE", "FIRE 2", "COIN", "START"];
+    const visibleText = [...document.querySelectorAll("#game *")]
+      .filter(element => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 18 &&
+          rect.height > 18 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden";
+      })
+      .map(element => (element.textContent || "").trim())
+      .filter(Boolean);
+    return wanted.filter(label => visibleText.some(text => text === label || text.includes(label)));
   });
 
-  await page.keyboard.press("Digit5").catch(() => {});
-  await page.waitForTimeout(500);
-  await page.keyboard.press("Digit1").catch(() => {});
-  await page.waitForTimeout(3000);
+  result.mobile_controls = ["FIRE", "COIN", "START"]
+    .every(label => result.visible_control_labels.includes(label));
+  if (!result.mobile_controls) {
+    throw new Error(
+      `Custom mobile controls were not all visible: ${JSON.stringify(result.visible_control_labels)}`
+    );
+  }
+
+  for (const label of ["COIN", "START"]) {
+    const button = page.getByText(label, { exact: true }).last();
+    if (await button.count()) {
+      await button.tap({ timeout: 10000 }).catch(() => button.click());
+      await page.waitForTimeout(600);
+    }
+  }
+
+  const fatal = fatalBrowserErrors();
+  if (fatal.length) {
+    throw new Error(`Browser errors detected:\n${fatal.join("\n\n")}`);
+  }
+
   await page.screenshot({ path: "smoke-mame.png", fullPage: true });
 }
 
@@ -103,10 +158,6 @@ try {
     await testLegacyVmPage();
   } else {
     throw new Error("No supported emulator page entry point was found");
-  }
-
-  if (browserErrors.length) {
-    throw new Error(`Browser errors detected:\n${browserErrors.join("\n\n")}`);
   }
 } catch (error) {
   result.error = error.stack || String(error);
