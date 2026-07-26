@@ -1,0 +1,79 @@
+name: Validate preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "preview/**"
+      - "runtime/**"
+      - "mame/**"
+      - "manifest.json"
+      - ".github/workflows/validate-preview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate required files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s preview/index.html
+          test -s runtime/v86_all.js
+          test -s mame/m37b14b.zip
+          test -s manifest.json
+
+      - name: Validate MAME archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -tqq mame/m37b14b.zip
+          unzip -Z1 mame/m37b14b.zip | grep -Eiq '(^|/)mame\.exe$'
+
+      - name: Validate embedded Preview JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          html = Path("preview/index.html").read_text(encoding="utf-8")
+          start = html.rfind("<script>")
+          end = html.rfind("</script>")
+          if start < 0 or end <= start:
+              raise SystemExit("Preview script block not found")
+
+          script = html[start + len("<script>"):end]
+          Path("/tmp/chat-vm-preview.js").write_text(script, encoding="utf-8")
+          PY
+          node --check /tmp/chat-vm-preview.js
+
+      - name: Validate manifest checksums
+        shell: python
+        run: |
+          import hashlib
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path("manifest.json").read_text(encoding="utf-8"))
+          for name, entry in manifest["assets"].items():
+              path = Path(entry["path"])
+              data = path.read_bytes()
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != entry["sha256"]:
+                  raise SystemExit(
+                      f"{name} checksum mismatch: {actual} != {entry['sha256']}"
+                  )
+              if len(data) != entry["bytes"]:
+                  raise SystemExit(
+                      f"{name} size mismatch: {len(data)} != {entry['bytes']}"
+                  )
