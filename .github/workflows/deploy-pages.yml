@@ -28,11 +28,40 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Fetch CWSDPMI runtime
+        run: |
+          set -euo pipefail
+          mkdir -p _generated
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://www.ibiblio.org/pub/micro/pc-stuff/freedos/files/repositories/1.2/util/cwsdpmi.zip \
+            --output _generated/cwsdpmi.zip
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive_path = Path("_generated/cwsdpmi.zip")
+          output_path = Path("_generated/CWSDPMI.EXE")
+
+          with ZipFile(archive_path) as archive:
+              candidates = [
+                  name for name in archive.namelist()
+                  if Path(name.replace("\\", "/")).name.upper() == "CWSDPMI.EXE"
+              ]
+              if not candidates:
+                  raise RuntimeError("CWSDPMI.EXE was not found in the FreeDOS package")
+              output_path.write_bytes(archive.read(candidates[0]))
+
+          if output_path.stat().st_size < 1024:
+              raise RuntimeError("CWSDPMI.EXE is unexpectedly small")
+          print(f"Extracted {output_path}: {output_path.stat().st_size} bytes")
+          PY
+
       - name: Build MAME data disk
         run: |
           set -euo pipefail
           python3 scripts/build_mame_disk.py \
             --zip mame/m37b14b.zip \
+            --extra-file CWSDPMI.EXE=_generated/CWSDPMI.EXE \
             --output _generated/mame-hda.img \
             --gzip-output _generated/mame-hda.img.gz \
             --size-mib 32
