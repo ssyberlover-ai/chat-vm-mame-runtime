@@ -1,22 +1,6 @@
 {
-  "result": "success",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30223394797",
+  "result": "cancelled",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30224643731",
   "public_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
-  "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
-    "interstitial_passed": false,
-    "page_loaded": true,
-    "dos_prompt": true,
-    "vm_ready": true,
-    "mame_graphics": true,
-    "final_status": "Robby Roto 실행 중…",
-    "screen_before_launch": "WARRANTY; you can redistribute it and/or modify it under the terms of the       GNU General Public License as published by the Free Software Foundation;        either version 2, or (at your option) any later version.                         - InitDiskWARNING: using suspect partition Pri:1 FS 06: with calculated values   65-0-16 instead of 1023-254-63                                                C: HD1, Pri[ 1], CHS=    0-1-1, start=     0 MB, size=    31 MB                 WARNING: using suspect partition Pri:1 FS 06: with calculated values    0-1-1 instead of    0-0-0                                                               WARNING: using suspect partition Pri:1 FS 06: with calculated values   32-8-8 instead of    0-0-0                                                               D: HD2, Pri[ 1], CHS=    0-1-1, start=     0 MB, size=    15 MB                 Can't disable A20 - ignored                                                     FreeDOS HIMEM 2.07 [Feb 13 2003] (c) 1995, Till Gerken 2001-2003 tom ehlert     Interface : XMS 2.00 80386 64MB                                                 Kernel: allocated 46 Diskbuffers = 24472 Bytes in HMA                                                                                                           FreeCom version 0.82 pl 3 XMS_Swap [Dec 10 2003 06:49:21]                                                                                                                                                                                       Welcome to FreeDOS (http://www.freedos.org)!                                    Running on copy.sh/v86/                                                                                                                                         Try 'invaders' or 'snake' or 'tetris' for fun.                                                                                                                  A:\\>                                                                            ",
-    "screen_after_launch": "  65-0-16 instead of 1023-254-63                                                C: HD1, Pri[ 1], CHS=    0-1-1, start=     0 MB, size=    31 MB                 WARNING: using suspect partition Pri:1 FS 06: with calculated values    0-1-1 instead of    0-0-0                                                               WARNING: using suspect partition Pri:1 FS 06: with calculated values   32-8-8 instead of    0-0-0                                                               D: HD2, Pri[ 1], CHS=    0-1-1, start=     0 MB, size=    15 MB                 Can't disable A20 - ignored                                                     FreeDOS HIMEM 2.07 [Feb 13 2003] (c) 1995, Till Gerken 2001-2003 tom ehlert     Interface : XMS 2.00 80386 64MB                                                 Kernel: allocated 46 Diskbuffers = 24472 Bytes in HMA                                                                                                           FreeCom version 0.82 pl 3 XMS_Swap [Dec 10 2003 06:49:21]                                                                                                                                                                                       Welcome to FreeDOS (http://www.freedos.org)!                                    Running on copy.sh/v86/                                                                                                                                         Try 'invaders' or 'snake' or 'tetris' for fun.                                                                                                                  A:\\>C:                                                                                                                                                          C:\\>PLAY.BAT                                                                                                                                                                                                                                    ",
-    "browser_errors": [],
-    "console": [
-      "log: [v86] emulator-ready undefined",
-      "log: [v86] emulator-started undefined",
-      "log: [v86] emulator-loaded undefined"
-    ]
-  }
+  "details": {}
 }
