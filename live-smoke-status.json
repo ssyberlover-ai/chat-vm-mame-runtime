@@ -1,13 +1,14 @@
 {
   "result": "failure",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30224999568",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30225224495",
   "public_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
   "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30224999568",
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30225224495",
     "page_loaded": true,
     "mode": "web-mame",
     "game_canvas": true,
-    "mobile_controls": true,
+    "mobile_controls": false,
+    "visible_control_labels": [],
     "final_status": "게임 실행 중",
     "browser_errors": [
       "NotAllowedError: Wake Lock permission request denied"
@@ -27,9 +28,11 @@
       "log: Translation not found for '+1'. Language set to 'en-US'",
       "log: Translation not found for '-1'. Language set to 'en-US'",
       "log: Translation not found for '+1'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200084000000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "log: Translation not found for 'FIRE 2'. Language set to 'en-US'",
+      "log: Translation not found for 'COIN'. Language set to 'en-US'",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000C41A0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
       "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
-      "warning: enlarged memory arrays from 16777216 to 33554432, took 3 ms (has ArrayBuffer.transfer? false)",
+      "warning: enlarged memory arrays from 16777216 to 33554432, took 4 ms (has ArrayBuffer.transfer? false)",
       "log: Translation not found for 'Core (Requires restart)'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Source'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Format'. Language set to 'en-US'",
@@ -45,12 +48,12 @@
       "log: Translation not found for 'Direct Keyboard Input'. Language set to 'en-US'",
       "log: Translation not found for 'Forward Alt key'. Language set to 'en-US'",
       "log: Translation not found for 'Lock Mouse'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200084000000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: [.WebGL-0x36c400d16900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x36c400d16900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x36c400d16900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x36c400d16900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000C41A0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [.WebGL-0x2e9c006f3100]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x2e9c006f3100]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x2e9c006f3100]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x2e9c006f3100]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
     ],
-    "error": "Error: Browser errors detected:\nNotAllowedError: Wake Lock permission request denied\n    at file:///home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:109:11"
+    "error": "Error: Custom mobile controls were not all visible: []\n    at testArcadePage (file:///home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:109:11)\n    at async file:///home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:156:5"
   }
 }
