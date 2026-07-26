@@ -11,9 +11,12 @@ page.on("console", message => consoleLines.push(`${message.type()}: ${message.te
 
 const result = {
   page_loaded: false,
+  dos_prompt: false,
   vm_ready: false,
   mame_graphics: false,
   final_status: "",
+  screen_before_launch: "",
+  screen_after_launch: "",
   browser_errors: browserErrors,
   console: consoleLines
 };
@@ -29,35 +32,61 @@ try {
   await page.click("#start");
 
   await page.waitForFunction(() => {
-    const text = document.querySelector("#status")?.textContent || "";
-    return text.includes("준비 완료") || text.includes("실행 실패");
-  }, { timeout: 120000 });
+    const text = window.chatVmDiagnostics?.screenText || "";
+    const status = window.chatVmDiagnostics?.status || "";
+    return /A:\\?>/i.test(text) || status.includes("실행 실패");
+  }, null, { timeout: 150000, polling: 250 });
 
   result.final_status = await page.locator("#status").textContent();
+  result.screen_before_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "");
   if (result.final_status.includes("실행 실패")) {
     throw new Error(await page.locator("#error").textContent());
   }
-  result.vm_ready = true;
+  result.dos_prompt = /A:\\?>/i.test(result.screen_before_launch);
+  if (!result.dos_prompt) {
+    throw new Error(`FreeDOS prompt was not detected:\n${result.screen_before_launch}`);
+  }
 
+  await page.waitForFunction(() => {
+    const text = document.querySelector("#status")?.textContent || "";
+    return text.includes("준비 완료") || text.includes("실행 실패");
+  }, null, { timeout: 30000, polling: 250 });
+
+  result.vm_ready = true;
+  await page.screenshot({ path: "smoke-dos-ready.png", fullPage: true });
   await page.click("#run");
+
   await page.waitForFunction(() => {
     const canvas = document.querySelector("#screen_container canvas");
-    return canvas && getComputedStyle(canvas).display !== "none" && canvas.width > 0;
-  }, { timeout: 60000 });
+    const status = document.querySelector("#status")?.textContent || "";
+    return status.includes("실행 실패") ||
+      Boolean(canvas && getComputedStyle(canvas).display !== "none" && canvas.width > 0 && canvas.height > 0);
+  }, null, { timeout: 180000, polling: 250 });
+
+  result.final_status = await page.locator("#status").textContent();
+  result.screen_after_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "");
+  if (result.final_status.includes("실행 실패")) {
+    throw new Error(await page.locator("#error").textContent());
+  }
   result.mame_graphics = true;
 
   await page.click('[data-key="o"]');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.click('[data-key="k"]');
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(3500);
   await page.click('[data-key="5"]');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.click('[data-key="1"]');
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(6000);
+
+  if (browserErrors.length) {
+    throw new Error(`Browser errors detected:\n${browserErrors.join("\n\n")}`);
+  }
 
   await page.screenshot({ path: "smoke-mame.png", fullPage: true });
 } catch (error) {
   result.error = error.stack || String(error);
+  result.screen_after_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "").catch(() => result.screen_after_launch);
   await page.screenshot({ path: "smoke-failure.png", fullPage: true }).catch(() => {});
   throw error;
 } finally {
