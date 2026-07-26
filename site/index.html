@@ -16,9 +16,10 @@ h1{margin:0;font-size:21px;line-height:1.15}header p{margin:5px 0 0;color:#9eabc
 #status{max-width:42%;font:12px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;color:#78efaa;text-align:right}
 #preflight{padding:18px;border:1px solid #33445e;border-radius:14px;background:#101827}
 #preflight p{margin:0 0 13px;font-size:13px;line-height:1.55;color:#c8d1e2}
+.agree{display:flex;align-items:flex-start;gap:9px;margin:14px 0;font-size:13px;line-height:1.45;color:#e5ebf7}.agree input{width:20px;height:20px;margin:0;flex:none}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 button{min-height:50px;padding:11px 18px;border:1px solid #4c8ee8;border-radius:11px;background:#245da8;color:#fff;font-size:16px;font-weight:800;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-button:disabled{opacity:.55}
+button:disabled{opacity:.45}
 a{color:#9ec5ff}
 #game-shell{margin-top:12px;padding:7px;border:1px solid #34445e;border-radius:14px;background:#000;overflow:hidden}
 #game{width:100%;height:min(82dvh,800px);min-height:520px;background:#000;overflow:hidden;touch-action:none}
@@ -46,8 +47,12 @@ body.running #preflight{display:none}
       Robby Roto ROM은 권리자의 허가에 따라 MAMEdev가 공개한 비상업적 사용용 파일입니다.
       모바일에서는 가로 화면과 전체화면을 권장합니다.
     </p>
+    <label class="agree">
+      <input id="agree" type="checkbox">
+      <span>Robby Roto ROM의 비상업적 사용 조건과 저작권 고지를 확인했습니다.</span>
+    </label>
     <div class="actions">
-      <button id="launch" type="button">Robby Roto 시작</button>
+      <button id="launch" type="button" disabled>Robby Roto 시작</button>
       <a href="https://www.mamedev.org/roms/robby/" target="_blank" rel="noopener">ROM 사용 조건</a>
     </div>
   </section>
@@ -65,18 +70,34 @@ body.running #preflight{display:none}
 <script>
 "use strict";
 (() => {
+  const agree = document.querySelector("#agree");
   const launch = document.querySelector("#launch");
   const shell = document.querySelector("#game-shell");
   const status = document.querySelector("#status");
   const error = document.querySelector("#error");
   let loading = false;
 
+  agree.addEventListener("change", () => {
+    launch.disabled = !agree.checked || loading;
+  });
+
   function fail(reason) {
     console.error(reason);
     status.textContent = "실행 실패";
     error.textContent = reason?.stack || String(reason);
-    launch.disabled = false;
+    launch.disabled = !agree.checked;
     loading = false;
+  }
+
+  function forceVirtualGamepad() {
+    const emulator = window.EJS_emulator;
+    if (!emulator) return false;
+    emulator.touch = true;
+    try { emulator.changeSettingOption?.("virtual-gamepad", "enabled", true); }
+    catch (reason) { console.warn("virtual-gamepad setting", reason); }
+    try { emulator.toggleVirtualGamepad?.(true); }
+    catch (reason) { console.warn("virtual-gamepad toggle", reason); }
+    return true;
   }
 
   window.addEventListener("error", event => {
@@ -86,10 +107,11 @@ body.running #preflight{display:none}
   });
 
   launch.addEventListener("click", () => {
-    if (loading) return;
+    if (loading || !agree.checked) return;
     loading = true;
     launch.disabled = true;
     status.textContent = "MAME 2003 Plus 로딩 중…";
+    error.textContent = "";
     shell.hidden = false;
     document.body.classList.add("running");
 
@@ -108,84 +130,41 @@ body.running #preflight{display:none}
     window.EJS_askBeforeExit = false;
     window.EJS_noAutoFocus = false;
     window.EJS_browserMode = "mobile";
+    window.EJS_AdUrl = "";
 
     window.EJS_VirtualGamepadSettings = [
-      {
-        type: "dpad",
-        location: "left",
-        left: "50%",
-        right: "50%",
-        joystickInput: false,
-        inputValues: [4, 5, 6, 7]
-      },
-      {
-        type: "button",
-        text: "FIRE",
-        id: "fire-b",
-        location: "right",
-        left: 24,
-        top: 26,
-        bold: true,
-        fontSize: 18,
-        input_value: 0
-      },
-      {
-        type: "button",
-        text: "FIRE 2",
-        id: "fire-a",
-        location: "right",
-        left: 102,
-        top: 84,
-        bold: true,
-        fontSize: 15,
-        input_value: 8
-      },
-      {
-        type: "button",
-        text: "COIN",
-        id: "coin",
-        location: "center",
-        left: -92,
-        fontSize: 14,
-        block: true,
-        input_value: 2
-      },
-      {
-        type: "button",
-        text: "START",
-        id: "start-game",
-        location: "center",
-        left: 5,
-        fontSize: 14,
-        block: true,
-        input_value: 3
-      }
+      { type: "dpad", location: "left", left: "50%", right: "50%", joystickInput: false, inputValues: [4, 5, 6, 7] },
+      { type: "button", text: "FIRE", id: "fire-b", location: "right", left: 24, top: 26, bold: true, fontSize: 18, input_value: 0 },
+      { type: "button", text: "FIRE 2", id: "fire-a", location: "right", left: 102, top: 84, bold: true, fontSize: 15, input_value: 8 },
+      { type: "button", text: "COIN", id: "coin", location: "center", left: -92, fontSize: 14, block: true, input_value: 2 },
+      { type: "button", text: "START", id: "start-game", location: "center", left: 5, fontSize: 14, block: true, input_value: 3 }
     ];
 
     window.EJS_Buttons = {
-      playPause: true,
-      restart: true,
-      mute: true,
-      settings: true,
-      fullscreen: true,
-      saveState: false,
-      loadState: false,
-      screenRecord: false,
-      gamepad: true,
-      cheat: false,
-      volume: true,
-      saveSavFiles: false,
-      loadSavFiles: false,
-      quickSave: false,
-      quickLoad: false,
-      screenshot: true,
-      cacheManager: false,
+      playPause: true, restart: true, mute: true, settings: true, fullscreen: true,
+      saveState: false, loadState: false, screenRecord: false, gamepad: true,
+      cheat: false, volume: true, saveSavFiles: false, loadSavFiles: false,
+      quickSave: false, quickLoad: false, screenshot: true, cacheManager: false,
       exitEmulation: false
+    };
+
+    window.EJS_ready = () => {
+      forceVirtualGamepad();
+      status.textContent = "코어 준비 완료";
     };
 
     window.EJS_onGameStart = () => {
       loading = false;
+      forceVirtualGamepad();
+      setTimeout(forceVirtualGamepad, 250);
+      setTimeout(forceVirtualGamepad, 1000);
       status.textContent = "게임 실행 중";
+      window.webMameDiagnostics = {
+        ready: true,
+        core: window.EJS_core,
+        hasEmulator: Boolean(window.EJS_emulator),
+        virtualGamepadForced: true
+      };
     };
 
     const loader = document.createElement("script");
