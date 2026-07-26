@@ -1,8 +1,10 @@
 {
   "result": "success",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30221705124",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30221909931",
   "runtime": "official-v86-0.5.424-wasm-cwsdpmi",
   "details": {
+    "target_url": "http://127.0.0.1:8000/index.html",
+    "interstitial_passed": false,
     "page_loaded": true,
     "dos_prompt": true,
     "vm_ready": true,
