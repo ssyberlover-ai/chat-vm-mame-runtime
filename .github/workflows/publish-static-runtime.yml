@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "site/index.html"
-      - "site/app.js"
+      - "site/emulator.js"
       - "site/styles.css"
       - "site/manifest.webmanifest"
       - "scripts/build_mame_disk.py"
@@ -33,11 +33,14 @@ jobs:
       - name: Build and collect runtime assets
         run: |
           set -euo pipefail
-          mkdir -p site/runtime site/bios site/images
-          rm -f site/runtime/v86_all.js
-          curl --fail --location --retry 4 --retry-all-errors \
-            https://raw.githubusercontent.com/Pixelsuft/v86-wasmless/3f7360b301732983de0aef027d7b5abda7ce3b0d/build/libv86.js \
-            --output site/runtime/libv86.js
+          mkdir -p site/runtime site/bios site/images /tmp/v86-package
+          rm -f site/runtime/v86_all.js site/runtime/libv86.js site/runtime/v86.wasm
+
+          V86_VERSION="0.5.424"
+          npm pack "v86@${V86_VERSION}" --silent --pack-destination /tmp/v86-package
+          tar -xzf "/tmp/v86-package/v86-${V86_VERSION}.tgz" -C /tmp/v86-package
+          cp /tmp/v86-package/package/build/libv86.js site/runtime/libv86.js
+          cp /tmp/v86-package/package/build/v86.wasm site/runtime/v86.wasm
 
           python3 scripts/build_mame_disk.py \
             --zip mame/m37b14b.zip \
@@ -55,8 +58,9 @@ jobs:
             https://raw.githubusercontent.com/copy/images/master/freedos722.img \
             --output site/images/freedos722.img
 
-          node --check site/app.js
+          node --check site/emulator.js
           test -s site/runtime/libv86.js
+          test -s site/runtime/v86.wasm
           test -s site/bios/seabios.bin
           test -s site/bios/vgabios.bin
           test -s site/images/freedos722.img
@@ -72,6 +76,7 @@ jobs:
 
           paths = [
               "site/runtime/libv86.js",
+              "site/runtime/v86.wasm",
               "site/bios/seabios.bin",
               "site/bios/vgabios.bin",
               "site/images/freedos722.img",
@@ -88,6 +93,7 @@ jobs:
           Path("site/runtime-manifest.json").write_text(
               json.dumps({
                   "generated_at": datetime.now(timezone.utc).isoformat(),
+                  "v86_version": "0.5.424",
                   "assets": assets,
               }, indent=2) + "\n",
               encoding="utf-8",
@@ -103,7 +109,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Static runtime assets are already current."
           else
-            git commit -m "chore: publish generated browser runtime assets"
+            git commit -m "chore: publish official v86 browser runtime"
             git push
           fi
 
