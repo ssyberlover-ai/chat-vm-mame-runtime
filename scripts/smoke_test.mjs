@@ -23,6 +23,7 @@ const result = {
   game_canvas: false,
   mobile_controls: false,
   visible_control_labels: [],
+  virtual_gamepad_display: "",
   final_status: "",
   browser_errors: browserErrors,
   console: consoleLines
@@ -44,11 +45,7 @@ async function waitForArcadeCanvas(timeoutMs = 240000) {
         .find(item => item.width > 0 && item.height > 0 && getComputedStyle(item).display !== "none");
       const status = document.querySelector("#status")?.textContent || "";
       const error = document.querySelector("#error")?.textContent || "";
-      return {
-        canvas: Boolean(canvas),
-        status,
-        error
-      };
+      return { canvas: Boolean(canvas), status, error };
     });
 
     if (state.error || state.status.includes("실행 실패")) {
@@ -63,11 +60,34 @@ async function waitForArcadeCanvas(timeoutMs = 240000) {
   throw new Error("Timed out waiting for the WebAssembly MAME canvas");
 }
 
+async function readVisibleControls() {
+  return page.evaluate(() => {
+    const wanted = ["FIRE", "FIRE 2", "COIN", "START"];
+    const visibleText = [...document.querySelectorAll("#game *")]
+      .filter(element => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return rect.width > 18 &&
+          rect.height > 18 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          Number(style.opacity || 1) > 0;
+      })
+      .map(element => (element.textContent || "").trim())
+      .filter(Boolean);
+    return wanted.filter(label => visibleText.some(text => text === label || text.includes(label)));
+  });
+}
+
 async function testArcadePage() {
   result.mode = "web-mame";
+  if (await page.locator("#agree").count()) {
+    await page.check("#agree");
+  }
   await page.click("#launch");
   await waitForArcadeCanvas();
-  await page.waitForTimeout(10000);
+  await page.setViewportSize({ width: 900, height: 430 });
+  await page.waitForTimeout(1800);
 
   result.final_status = await page.locator("#status").textContent();
   const errorText = await page.locator("#error").textContent();
@@ -87,22 +107,24 @@ async function testArcadePage() {
     throw new Error("EmulatorJS game canvas was not detected");
   }
 
-  result.visible_control_labels = await page.evaluate(() => {
-    const wanted = ["FIRE", "FIRE 2", "COIN", "START"];
+  await page.waitForFunction(() => {
+    const wanted = ["FIRE", "COIN", "START"];
     const visibleText = [...document.querySelectorAll("#game *")]
       .filter(element => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        return rect.width > 18 &&
-          rect.height > 18 &&
-          style.display !== "none" &&
-          style.visibility !== "hidden";
+        return rect.width > 18 && rect.height > 18 &&
+          style.display !== "none" && style.visibility !== "hidden";
       })
-      .map(element => (element.textContent || "").trim())
-      .filter(Boolean);
-    return wanted.filter(label => visibleText.some(text => text === label || text.includes(label)));
-  });
+      .map(element => (element.textContent || "").trim());
+    return wanted.every(label => visibleText.some(text => text === label || text.includes(label)));
+  }, null, { timeout: 30000, polling: 300 });
 
+  result.visible_control_labels = await readVisibleControls();
+  result.virtual_gamepad_display = await page.evaluate(() => {
+    const gamepad = window.EJS_emulator?.virtualGamepad;
+    return gamepad ? getComputedStyle(gamepad).display : "missing";
+  });
   result.mobile_controls = ["FIRE", "COIN", "START"]
     .every(label => result.visible_control_labels.includes(label));
   if (!result.mobile_controls) {
