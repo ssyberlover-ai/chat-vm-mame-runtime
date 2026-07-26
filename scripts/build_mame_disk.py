@@ -195,7 +195,9 @@ def main() -> None:
 
     selected["PLAY.BAT"] = (
         b"@ECHO OFF\r\n"
-        b"MAME.EXE ROBBY -ROMPATH D:\\ -SOUNDCARD 0\r\n"
+        b"MAME.EXE ROBBY -ROMPATH D:\\ -SOUNDCARD 0 "
+        b"-VESA -VESAMODE VESA2B -RESOLUTION 640X480 -DEPTH 8 "
+        b"-NOSCANLINES -STRETCH -STEADYKEY\r\n"
     )
     selected["MAMEINFO.BAT"] = b"@ECHO OFF\r\nMAME.EXE -HELP\r\n"
 
