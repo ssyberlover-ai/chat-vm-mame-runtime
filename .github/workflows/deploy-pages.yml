@@ -1,0 +1,81 @@
+name: Build and deploy emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "scripts/build_mame_disk.py"
+      - "runtime/v86_all.js"
+      - "mame/m37b14b.zip"
+      - ".github/workflows/deploy-pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build MAME data disk
+        run: |
+          set -euo pipefail
+          python3 scripts/build_mame_disk.py \
+            --zip mame/m37b14b.zip \
+            --output _generated/mame-hda.img \
+            --gzip-output _generated/mame-hda.img.gz \
+            --size-mib 32
+
+      - name: Assemble same-origin site
+        run: |
+          set -euo pipefail
+          mkdir -p _site/runtime _site/bios _site/images
+          cp site/index.html site/app.js site/styles.css site/manifest.webmanifest _site/
+          cp runtime/v86_all.js _site/runtime/
+          cp _generated/mame-hda.img _generated/mame-hda.img.gz _site/images/
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/seabios.bin \
+            --output _site/bios/seabios.bin
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/vgabios.bin \
+            --output _site/bios/vgabios.bin
+          curl --fail --location --retry 4 --retry-all-errors \
+            https://raw.githubusercontent.com/copy/images/master/freedos722.img \
+            --output _site/images/freedos722.img
+          touch _site/.nojekyll
+          test -s _site/runtime/v86_all.js
+          test -s _site/images/mame-hda.img.gz
+          test -s _site/images/freedos722.img
+
+      - name: Validate JavaScript
+        run: node --check _site/app.js
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
