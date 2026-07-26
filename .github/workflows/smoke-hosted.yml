@@ -1,0 +1,94 @@
+name: Smoke test hosted emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "site/index.html"
+      - "site/emulator-v2.js"
+      - "site/styles.css"
+      - "site/manifest.webmanifest"
+      - "site/runtime/**"
+      - "site/bios/**"
+      - "site/images/**"
+      - "scripts/smoke_test.mjs"
+      - ".github/workflows/smoke-hosted.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smoke-hosted-emulator
+  cancel-in-progress: true
+
+jobs:
+  hosted-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run hosted browser launch test
+        id: browser_test
+        continue-on-error: true
+        env:
+          SMOKE_URL: https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/main/site/index.html
+        run: node scripts/smoke_test.mjs
+
+      - name: Upload hosted smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hosted-emulator-smoke-evidence
+          path: |
+            smoke-result.json
+            smoke-dos-ready.png
+            smoke-mame.png
+            smoke-failure.png
+          if-no-files-found: ignore
+
+      - name: Record hosted smoke result
+        if: always()
+        env:
+          TEST_OUTCOME: ${{ steps.browser_test.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          details = {}
+          result_path = Path("smoke-result.json")
+          if result_path.exists():
+              details = json.loads(result_path.read_text(encoding="utf-8"))
+          output = {
+              "result": os.environ["TEST_OUTCOME"],
+              "run_url": os.environ["RUN_URL"],
+              "public_url": "https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/main/site/index.html",
+              "details": details,
+          }
+          Path("hosted-smoke-status.json").write_text(
+              json.dumps(output, indent=2, ensure_ascii=False) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hosted-smoke-status.json
+          git commit -m "chore: record hosted emulator smoke test" || true
+          git push
+
+      - name: Fail workflow when hosted browser test failed
+        if: steps.browser_test.outcome != 'success'
+        run: exit 1
