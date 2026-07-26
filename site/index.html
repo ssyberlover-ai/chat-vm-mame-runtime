@@ -3,169 +3,122 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0b1018">
-<title>Chat VM · Robby Roto</title>
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="stylesheet" href="./styles.css">
+<meta name="theme-color" content="#070b12">
+<title>Robby Roto · Web MAME</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b12;color:#f4f7ff}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#070b12}
+body{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));overscroll-behavior:none}
+main{width:min(100%,1000px);margin:auto}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+h1{margin:0;font-size:21px;line-height:1.15}header p{margin:5px 0 0;color:#9eabc1;font-size:13px}
+#status{max-width:42%;font:12px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;color:#78efaa;text-align:right}
+#preflight{padding:18px;border:1px solid #33445e;border-radius:14px;background:#101827}
+#preflight p{margin:0 0 13px;font-size:13px;line-height:1.55;color:#c8d1e2}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+button{min-height:50px;padding:11px 18px;border:1px solid #4c8ee8;border-radius:11px;background:#245da8;color:#fff;font-size:16px;font-weight:800;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.55}
+a{color:#9ec5ff}
+#game-shell{margin-top:12px;padding:7px;border:1px solid #34445e;border-radius:14px;background:#000;overflow:hidden}
+#game{width:100%;height:min(76dvh,760px);min-height:430px;background:#000;overflow:hidden}
+#game canvas{image-rendering:pixelated}
+.notice{margin-top:12px;padding:11px;border:1px solid #354760;border-radius:10px;background:#0e1726;font-size:12px;line-height:1.5;color:#bec9dc}
+#error{white-space:pre-wrap;color:#ff9b9b;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+body.running #preflight{display:none}
+@media (orientation:landscape) and (max-height:650px){body{padding:4px}main{width:100%}header{position:absolute;z-index:3;left:12px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}header p{display:none}h1{font-size:15px}#status{font-size:10px}#game-shell{margin:0;padding:0;border:0;border-radius:0}#game{height:calc(100dvh - 8px);min-height:0}.notice{display:none}}
+</style>
 </head>
 <body>
 <main>
   <header>
     <div>
-      <h1>Chat VM · DOS MAME</h1>
-      <p>공식 무료 배포 ROM · Robby Roto</p>
+      <h1>Robby Roto · Web MAME</h1>
+      <p>모바일 멀티터치 게임패드 · 브라우저 직접 실행</p>
     </div>
     <div id="status" role="status">시작 대기</div>
   </header>
 
-  <progress id="progress" max="100" value="0" hidden></progress>
-
-  <section class="vm-shell" aria-label="에뮬레이터 화면">
-    <div id="screen_container" tabindex="0">
-      <div></div>
-      <canvas></canvas>
-      <div id="cover">
-        <strong>브라우저에서 바로 실행</strong>
-        <span>약관 확인 후 VM 시작을 누르세요.</span>
-      </div>
+  <section id="preflight">
+    <p>
+      기존 FreeDOS VM의 DOS VGA 출력은 실제 게임 화면이 깨져 플레이에 적합하지 않았습니다.
+      이 페이지는 MAME 2003 WebAssembly 코어로 게임을 직접 실행합니다.
+      Robby Roto ROM은 권리자의 허가에 따라 MAMEdev가 공개한 비상업적 사용용 파일을 사용합니다.
+    </p>
+    <div class="actions">
+      <button id="launch" type="button">Robby Roto 시작</button>
+      <a href="https://www.mamedev.org/roms/robby/" target="_blank" rel="noopener">ROM 사용 조건</a>
     </div>
   </section>
 
-  <section class="start-panel">
-    <label class="agree">
-      <input id="agree" type="checkbox">
-      <span>Robby Roto ROM의 비상업적 사용 조건과 저작권 고지를 확인했습니다.</span>
-    </label>
-    <button id="start" class="primary" disabled>VM 시작</button>
-    <button id="run" class="primary" disabled>Robby Roto 실행</button>
+  <section id="game-shell" hidden aria-label="Robby Roto 에뮬레이터">
+    <div id="game"></div>
   </section>
-
-  <section class="toolbar">
-    <button id="info" disabled>MAME 정보</button>
-    <button id="reboot" disabled>재부팅</button>
-    <button id="pause" disabled>일시정지</button>
-    <button id="full" disabled>전체화면</button>
-  </section>
-
-  <section class="pad" aria-label="게임 조작">
-    <button data-key="up">▲</button>
-    <button data-key="left">◀</button>
-    <button data-key="enter">ENTER</button>
-    <button data-key="right">▶</button>
-    <button data-key="down">▼</button>
-    <button id="ok-pass" type="button">OK 통과</button>
-    <button data-key="o">O</button>
-    <button data-key="k">K</button>
-    <button data-key="5">5 COIN</button>
-    <button data-key="1">1 START</button>
-    <button data-key="ctrl">CTRL</button>
-    <button data-key="alt">ALT</button>
-    <button data-key="space">SPACE</button>
-    <button data-key="esc">ESC</button>
-  </section>
-
-  <details>
-    <summary>DOS 명령 입력</summary>
-    <div class="command-row">
-      <input id="command" placeholder="예: dir, c:, mame -help" disabled>
-      <button id="send" disabled>전송</button>
-    </div>
-  </details>
 
   <aside class="notice">
-    상용 ROM은 포함하지 않습니다. Robby Roto는 권리자의 허가에 따라 MAMEdev가 비상업적 사용용으로 공개한 ROM을 공식 MAMEdev GitHub 저장소에서 직접 불러옵니다. MAME 경고 화면에서는 <b>OK 통과</b> 또는 <b>O → K</b>, 게임 시작은 <b>5 COIN → 1 START</b>를 누르세요.
+    화면을 가로로 돌리면 게임 화면과 가상 패드가 크게 표시됩니다. 기본 조작은 방향 패드, 버튼 1, COIN, START입니다.
   </aside>
-
   <pre id="error" aria-live="polite"></pre>
 </main>
-<script src="./runtime/libv86.js"></script>
-<script>
-"use strict";
-if (typeof window.V86 !== "function") {
-  throw new Error("공식 v86 런타임이 V86 생성자를 등록하지 않았습니다.");
-}
-</script>
-<script src="./emulator-v2.js"></script>
+
 <script>
 "use strict";
 (() => {
-  const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
-  const keyScans = {
-    up: { down: [0xe0, 0x48], up: [0xe0, 0xc8] },
-    down: { down: [0xe0, 0x50], up: [0xe0, 0xd0] },
-    left: { down: [0xe0, 0x4b], up: [0xe0, 0xcb] },
-    right: { down: [0xe0, 0x4d], up: [0xe0, 0xcd] },
-    enter: { down: [0x1c], up: [0x9c] },
-    esc: { down: [0x01], up: [0x81] },
-    ctrl: { down: [0x1d], up: [0x9d] },
-    alt: { down: [0x38], up: [0xb8] },
-    space: { down: [0x39], up: [0xb9] },
-    "1": { down: [0x02], up: [0x82] },
-    "5": { down: [0x06], up: [0x86] },
-    o: { down: [0x18], up: [0x98] },
-    k: { down: [0x25], up: [0xa5] }
-  };
+  const launch = document.querySelector("#launch");
+  const shell = document.querySelector("#game-shell");
+  const status = document.querySelector("#status");
+  const error = document.querySelector("#error");
+  let loading = false;
 
-  let inputQueue = Promise.resolve();
-
-  async function performTap(name, holdMilliseconds = 110, settleMilliseconds = 80) {
-    const scan = keyScans[name];
-    const vm = window.mameVm;
-    if (!scan || !vm) return;
-
-    vm.keyboard_send_scancodes(scan.down);
-    await sleep(holdMilliseconds);
-    vm.keyboard_send_scancodes(scan.up);
-    await sleep(settleMilliseconds);
-    document.querySelector("#screen_container")?.focus();
+  function fail(reason) {
+    console.error(reason);
+    status.textContent = "실행 실패";
+    error.textContent = reason?.stack || String(reason);
+    launch.disabled = false;
+    loading = false;
   }
 
-  function enqueue(task) {
-    inputQueue = inputQueue.then(task, task);
-    return inputQueue;
-  }
-
-  function tapKey(name) {
-    return enqueue(() => performTap(name));
-  }
-
-  function sendOk() {
-    return enqueue(async () => {
-      await performTap("o", 140, 240);
-      await performTap("k", 140, 120);
-      const status = document.querySelector("#status");
-      if (status) status.textContent = "O → K 입력 전송 완료";
-    });
-  }
-
-  document.addEventListener("pointerdown", event => {
-    const okButton = event.target.closest?.("#ok-pass");
-    if (okButton) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      void sendOk();
-      return;
-    }
-
-    const keyButton = event.target.closest?.("[data-key]");
-    if (!keyButton) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    void tapKey(keyButton.dataset.key);
-  }, true);
-
-  document.querySelector("#ok-pass")?.addEventListener("click", event => {
-    if (event.detail !== 0) return;
-    event.preventDefault();
-    void sendOk();
+  window.addEventListener("error", event => {
+    if (loading) fail(event.error || event.message);
   });
 
-  window.chatVmInputFix = {
-    version: "1.0.0",
-    tapKey,
-    sendOk
-  };
+  launch.addEventListener("click", () => {
+    if (loading) return;
+    loading = true;
+    launch.disabled = true;
+    status.textContent = "MAME WebAssembly 로딩 중…";
+    shell.hidden = false;
+    document.body.classList.add("running");
+
+    window.EJS_player = "#game";
+    window.EJS_core = "mame2003";
+    window.EJS_gameName = "Robby Roto";
+    window.EJS_gameUrl = "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip";
+    window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
+    window.EJS_startOnLoaded = true;
+    window.EJS_fullscreenOnLoaded = false;
+    window.EJS_controlScheme = "mame";
+    window.EJS_gameID = "robby-roto-public-domain";
+    window.EJS_backgroundColor = "#000";
+    window.EJS_disableAutoLang = false;
+    window.EJS_language = "ko-KR";
+    window.EJS_askBeforeExit = false;
+    window.EJS_noAutoFocus = false;
+    if (matchMedia("(pointer: coarse)").matches) {
+      window.EJS_browserMode = "mobile";
+    }
+
+    window.EJS_onGameStart = () => {
+      loading = false;
+      status.textContent = "게임 실행 중";
+    };
+
+    const loader = document.createElement("script");
+    loader.src = "https://cdn.emulatorjs.org/4.2.3/data/loader.js";
+    loader.async = true;
+    loader.onerror = () => fail(new Error("EmulatorJS 로더를 가져오지 못했습니다."));
+    document.body.appendChild(loader);
+  });
 })();
 </script>
 </body>
