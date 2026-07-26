@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - "site/index.html"
-      - "site/app.js"
+      - "site/emulator.js"
       - "site/styles.css"
       - "site/manifest.webmanifest"
       - "site/runtime/**"
@@ -31,6 +31,12 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: main
+
+      - name: Verify official v86 assets
+        run: |
+          test -s site/runtime/libv86.js
+          test -s site/runtime/v86.wasm
+          grep -q 'runtime/v86.wasm' site/index.html
 
       - name: Install Playwright Chromium
         run: |
@@ -60,6 +66,7 @@ jobs:
           name: emulator-smoke-evidence
           path: |
             smoke-result.json
+            smoke-dos-ready.png
             smoke-mame.png
             smoke-failure.png
             /tmp/chat-vm-http.log
@@ -83,6 +90,7 @@ jobs:
           output = {
               "result": os.environ["TEST_OUTCOME"],
               "run_url": os.environ["RUN_URL"],
+              "runtime": "official-v86-0.5.424-wasm",
               "details": details,
           }
           Path("smoke-status.json").write_text(
