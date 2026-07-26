@@ -3,7 +3,13 @@ import { writeFile } from "node:fs/promises";
 
 const targetUrl = process.env.SMOKE_URL || "http://127.0.0.1:8000/index.html";
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 430, height: 900 } });
+const context = await browser.newContext({
+  viewport: { width: 430, height: 900 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 1
+});
+const page = await context.newPage();
 const browserErrors = [];
 const consoleLines = [];
 
@@ -12,94 +18,98 @@ page.on("console", message => consoleLines.push(`${message.type()}: ${message.te
 
 const result = {
   target_url: targetUrl,
-  interstitial_passed: false,
   page_loaded: false,
-  dos_prompt: false,
-  vm_ready: false,
-  mame_graphics: false,
+  mode: "unknown",
+  game_canvas: false,
+  mobile_controls: false,
   final_status: "",
-  screen_before_launch: "",
-  screen_after_launch: "",
   browser_errors: browserErrors,
   console: consoleLines
 };
 
-try {
-  await page.goto(targetUrl, {
-    waitUntil: "networkidle",
-    timeout: 60000
-  });
+async function testArcadePage() {
+  result.mode = "web-mame";
+  await page.click("#launch");
 
-  const openPageLink = page.getByText("Open the page", { exact: true });
-  if (await openPageLink.count()) {
-    await Promise.all([
-      page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {}),
-      openPageLink.first().click()
-    ]);
-    result.interstitial_passed = true;
+  await page.waitForFunction(() => {
+    const status = document.querySelector("#status")?.textContent || "";
+    const canvas = document.querySelector("#game canvas");
+    const error = document.querySelector("#error")?.textContent || "";
+    return status.includes("게임 실행 중") ||
+      Boolean(canvas && canvas.width > 0 && canvas.height > 0) ||
+      error.length > 0 ||
+      status.includes("실행 실패");
+  }, null, { timeout: 240000, polling: 300 });
+
+  await page.waitForTimeout(12000);
+  result.final_status = await page.locator("#status").textContent();
+  const errorText = await page.locator("#error").textContent();
+  if (errorText || result.final_status.includes("실행 실패")) {
+    throw new Error(errorText || result.final_status);
   }
 
-  result.page_loaded = true;
-  await page.waitForSelector("#agree", { timeout: 60000 });
+  result.game_canvas = await page.evaluate(() => {
+    const canvases = [...document.querySelectorAll("#game canvas")];
+    return canvases.some(canvas => canvas.width > 0 && canvas.height > 0 && getComputedStyle(canvas).display !== "none");
+  });
+  if (!result.game_canvas) {
+    throw new Error("EmulatorJS game canvas was not detected");
+  }
+
+  result.mobile_controls = await page.evaluate(() => {
+    const candidates = [...document.querySelectorAll("#game button, #game [class*='button'], #game [class*='control'], #game [class*='gamepad']")];
+    return candidates.some(element => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 20 && rect.height > 20;
+    });
+  });
+
+  await page.keyboard.press("Digit5").catch(() => {});
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Digit1").catch(() => {});
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: "smoke-mame.png", fullPage: true });
+}
+
+async function testLegacyVmPage() {
+  result.mode = "legacy-v86";
   await page.check("#agree");
   await page.click("#start");
-
   await page.waitForFunction(() => {
     const text = window.chatVmDiagnostics?.screenText || "";
     const status = window.chatVmDiagnostics?.status || "";
     return /A:\\?>/i.test(text) || status.includes("실행 실패");
   }, null, { timeout: 150000, polling: 250 });
-
-  result.final_status = await page.locator("#status").textContent();
-  result.screen_before_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "");
-  if (result.final_status.includes("실행 실패")) {
-    throw new Error(await page.locator("#error").textContent());
-  }
-  result.dos_prompt = /A:\\?>/i.test(result.screen_before_launch);
-  if (!result.dos_prompt) {
-    throw new Error(`FreeDOS prompt was not detected:\n${result.screen_before_launch}`);
-  }
-
-  await page.waitForFunction(() => {
-    const text = document.querySelector("#status")?.textContent || "";
-    return text.includes("준비 완료") || text.includes("실행 실패");
-  }, null, { timeout: 30000, polling: 250 });
-
-  result.vm_ready = true;
-  await page.screenshot({ path: "smoke-dos-ready.png", fullPage: true });
+  const status = await page.locator("#status").textContent();
+  if (status.includes("실행 실패")) throw new Error(await page.locator("#error").textContent());
   await page.click("#run");
-
   await page.waitForFunction(() => {
     const canvas = document.querySelector("#screen_container canvas");
-    const status = document.querySelector("#status")?.textContent || "";
-    return status.includes("실행 실패") ||
-      Boolean(canvas && getComputedStyle(canvas).display !== "none" && canvas.width > 0 && canvas.height > 0);
+    return Boolean(canvas && getComputedStyle(canvas).display !== "none" && canvas.width > 0 && canvas.height > 0);
   }, null, { timeout: 180000, polling: 250 });
-
+  result.game_canvas = true;
   result.final_status = await page.locator("#status").textContent();
-  result.screen_after_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "");
-  if (result.final_status.includes("실행 실패")) {
-    throw new Error(await page.locator("#error").textContent());
-  }
-  result.mame_graphics = true;
+  await page.screenshot({ path: "smoke-mame.png", fullPage: true });
+}
 
-  await page.click('[data-key="o"]');
-  await page.waitForTimeout(700);
-  await page.click('[data-key="k"]');
-  await page.waitForTimeout(3500);
-  await page.click('[data-key="5"]');
-  await page.waitForTimeout(700);
-  await page.click('[data-key="1"]');
-  await page.waitForTimeout(6000);
+try {
+  await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 60000 });
+  result.page_loaded = true;
+
+  if (await page.locator("#launch").count()) {
+    await testArcadePage();
+  } else if (await page.locator("#agree").count()) {
+    await testLegacyVmPage();
+  } else {
+    throw new Error("No supported emulator page entry point was found");
+  }
 
   if (browserErrors.length) {
     throw new Error(`Browser errors detected:\n${browserErrors.join("\n\n")}`);
   }
-
-  await page.screenshot({ path: "smoke-mame.png", fullPage: true });
 } catch (error) {
   result.error = error.stack || String(error);
-  result.screen_after_launch = await page.evaluate(() => window.chatVmDiagnostics?.screenText || "").catch(() => result.screen_after_launch);
   await page.screenshot({ path: "smoke-failure.png", fullPage: true }).catch(() => {});
   throw error;
 } finally {
