@@ -78,6 +78,20 @@
   <pre id="error" aria-live="polite"></pre>
 </main>
 <script src="./runtime/libv86.js"></script>
+<script>
+"use strict";
+if (typeof window.V86 !== "function") {
+  throw new Error("공식 v86 런타임이 V86 클래스를 등록하지 않았습니다.");
+}
+window.V86Starter = class V86StarterCompat extends window.V86 {
+  constructor(options) {
+    super({
+      wasm_path: "./runtime/v86.wasm",
+      ...options
+    });
+  }
+};
+</script>
 <script src="./emulator.js"></script>
 </body>
 </html>
