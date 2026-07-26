@@ -1,0 +1,17 @@
+{
+  "result": "failure",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30220421808",
+  "details": {
+    "page_loaded": true,
+    "vm_ready": true,
+    "mame_graphics": false,
+    "final_status": "Robby Roto 실행 명령 전송",
+    "browser_errors": [
+      "TypeError: Cannot set properties of null (setting 'onclick')\n    at f (http://127.0.0.1:8000/runtime/v86_all.js:40:292)"
+    ],
+    "console": [
+      "error: TypeError: Cannot set properties of null (setting 'onclick')\n    at f (http://127.0.0.1:8000/runtime/v86_all.js:40:292)"
+    ],
+    "error": "page.waitForFunction: Timeout 30000ms exceeded.\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:43:14"
+  }
+}
