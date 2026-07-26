@@ -53,6 +53,7 @@
     <button data-key="enter">ENTER</button>
     <button data-key="right">▶</button>
     <button data-key="down">▼</button>
+    <button id="ok-pass" type="button">OK 통과</button>
     <button data-key="o">O</button>
     <button data-key="k">K</button>
     <button data-key="5">5 COIN</button>
@@ -72,7 +73,7 @@
   </details>
 
   <aside class="notice">
-    상용 ROM은 포함하지 않습니다. Robby Roto는 권리자의 허가에 따라 MAMEdev가 비상업적 사용용으로 공개한 ROM을 공식 MAMEdev GitHub 저장소에서 직접 불러옵니다. MAME 경고 화면에서는 <b>O → K</b>, 게임 시작은 <b>5 COIN → 1 START</b>를 누르세요.
+    상용 ROM은 포함하지 않습니다. Robby Roto는 권리자의 허가에 따라 MAMEdev가 비상업적 사용용으로 공개한 ROM을 공식 MAMEdev GitHub 저장소에서 직접 불러옵니다. MAME 경고 화면에서는 <b>OK 통과</b> 또는 <b>O → K</b>, 게임 시작은 <b>5 COIN → 1 START</b>를 누르세요.
   </aside>
 
   <pre id="error" aria-live="polite"></pre>
@@ -85,5 +86,87 @@ if (typeof window.V86 !== "function") {
 }
 </script>
 <script src="./emulator-v2.js"></script>
+<script>
+"use strict";
+(() => {
+  const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+  const keyScans = {
+    up: { down: [0xe0, 0x48], up: [0xe0, 0xc8] },
+    down: { down: [0xe0, 0x50], up: [0xe0, 0xd0] },
+    left: { down: [0xe0, 0x4b], up: [0xe0, 0xcb] },
+    right: { down: [0xe0, 0x4d], up: [0xe0, 0xcd] },
+    enter: { down: [0x1c], up: [0x9c] },
+    esc: { down: [0x01], up: [0x81] },
+    ctrl: { down: [0x1d], up: [0x9d] },
+    alt: { down: [0x38], up: [0xb8] },
+    space: { down: [0x39], up: [0xb9] },
+    "1": { down: [0x02], up: [0x82] },
+    "5": { down: [0x06], up: [0x86] },
+    o: { down: [0x18], up: [0x98] },
+    k: { down: [0x25], up: [0xa5] }
+  };
+
+  let inputQueue = Promise.resolve();
+
+  async function performTap(name, holdMilliseconds = 110, settleMilliseconds = 80) {
+    const scan = keyScans[name];
+    const vm = window.mameVm;
+    if (!scan || !vm) return;
+
+    vm.keyboard_send_scancodes(scan.down);
+    await sleep(holdMilliseconds);
+    vm.keyboard_send_scancodes(scan.up);
+    await sleep(settleMilliseconds);
+    document.querySelector("#screen_container")?.focus();
+  }
+
+  function enqueue(task) {
+    inputQueue = inputQueue.then(task, task);
+    return inputQueue;
+  }
+
+  function tapKey(name) {
+    return enqueue(() => performTap(name));
+  }
+
+  function sendOk() {
+    return enqueue(async () => {
+      await performTap("o", 140, 240);
+      await performTap("k", 140, 120);
+      const status = document.querySelector("#status");
+      if (status) status.textContent = "O → K 입력 전송 완료";
+    });
+  }
+
+  document.addEventListener("pointerdown", event => {
+    const okButton = event.target.closest?.("#ok-pass");
+    if (okButton) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void sendOk();
+      return;
+    }
+
+    const keyButton = event.target.closest?.("[data-key]");
+    if (!keyButton) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void tapKey(keyButton.dataset.key);
+  }, true);
+
+  document.querySelector("#ok-pass")?.addEventListener("click", event => {
+    if (event.detail !== 0) return;
+    event.preventDefault();
+    void sendOk();
+  });
+
+  window.chatVmInputFix = {
+    version: "1.0.0",
+    tapKey,
+    sendOk
+  };
+})();
+</script>
 </body>
 </html>
