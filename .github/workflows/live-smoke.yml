@@ -63,6 +63,11 @@ jobs:
           PUBLIC_URL: https://rawcdn.githack.com/${{ github.repository }}/${{ github.sha }}/site/index.html
           TESTED_URL: https://rawcdn.githack.com/${{ github.repository }}/${{ github.sha }}/site/index.html
         run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
           python3 - <<'PY'
           import json
           import os
@@ -85,8 +90,6 @@ jobs:
           )
           PY
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add live-smoke-status.json
           git commit -m "chore: record hosted emulator smoke test" || true
           git push
