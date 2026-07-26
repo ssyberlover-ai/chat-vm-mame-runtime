@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: live-smoke-test-emulator
-  cancel-in-progress: true
+  group: live-smoke-test-emulator-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
@@ -33,14 +33,14 @@ jobs:
         id: browser_test
         continue-on-error: true
         env:
-          SMOKE_URL: https://ssyberlover-ai.github.io/chat-vm-mame-runtime/
+          SMOKE_URL: https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=${{ github.run_id }}
         run: node scripts/smoke_test.mjs
 
       - name: Upload live smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: emulator-live-smoke-evidence
+          name: emulator-live-smoke-evidence-${{ github.run_id }}
           path: |
             smoke-result.json
             smoke-dos-ready.png
