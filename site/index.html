@@ -21,12 +21,13 @@ button{min-height:50px;padding:11px 18px;border:1px solid #4c8ee8;border-radius:
 button:disabled{opacity:.55}
 a{color:#9ec5ff}
 #game-shell{margin-top:12px;padding:7px;border:1px solid #34445e;border-radius:14px;background:#000;overflow:hidden}
-#game{width:100%;height:min(76dvh,760px);min-height:430px;background:#000;overflow:hidden}
+#game{width:100%;height:min(82dvh,800px);min-height:520px;background:#000;overflow:hidden;touch-action:none}
 #game canvas{image-rendering:pixelated}
 .notice{margin-top:12px;padding:11px;border:1px solid #354760;border-radius:10px;background:#0e1726;font-size:12px;line-height:1.5;color:#bec9dc}
 #error{white-space:pre-wrap;color:#ff9b9b;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
 body.running #preflight{display:none}
-@media (orientation:landscape) and (max-height:650px){body{padding:4px}main{width:100%}header{position:absolute;z-index:3;left:12px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}header p{display:none}h1{font-size:15px}#status{font-size:10px}#game-shell{margin:0;padding:0;border:0;border-radius:0}#game{height:calc(100dvh - 8px);min-height:0}.notice{display:none}}
+@media (max-width:600px) and (orientation:portrait){#game{height:78dvh;min-height:560px}.notice{font-size:11px}}
+@media (orientation:landscape) and (max-height:700px){body{padding:4px}main{width:100%}header{position:absolute;z-index:3;left:12px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}header p{display:none}h1{font-size:15px}#status{font-size:10px}#game-shell{margin:0;padding:0;border:0;border-radius:0}#game{height:calc(100dvh - 8px);min-height:0}.notice{display:none}}
 </style>
 </head>
 <body>
@@ -34,16 +35,16 @@ body.running #preflight{display:none}
   <header>
     <div>
       <h1>Robby Roto · Web MAME</h1>
-      <p>모바일 멀티터치 게임패드 · 브라우저 직접 실행</p>
+      <p>멀티터치 D-pad · FIRE · COIN · START</p>
     </div>
     <div id="status" role="status">시작 대기</div>
   </header>
 
   <section id="preflight">
     <p>
-      기존 FreeDOS VM의 DOS VGA 출력은 실제 게임 화면이 깨져 플레이에 적합하지 않았습니다.
-      이 페이지는 MAME 2003 Plus WebAssembly 코어로 게임을 직접 실행합니다.
-      Robby Roto ROM은 권리자의 허가에 따라 MAMEdev가 공개한 비상업적 사용용 파일을 사용합니다.
+      MAME 2003 Plus WebAssembly 코어로 게임을 직접 실행합니다.
+      Robby Roto ROM은 권리자의 허가에 따라 MAMEdev가 공개한 비상업적 사용용 파일입니다.
+      모바일에서는 가로 화면과 전체화면을 권장합니다.
     </p>
     <div class="actions">
       <button id="launch" type="button">Robby Roto 시작</button>
@@ -56,7 +57,7 @@ body.running #preflight{display:none}
   </section>
 
   <aside class="notice">
-    화면을 가로로 돌리면 게임 화면과 가상 패드가 크게 표시됩니다. 기본 조작은 방향 패드, 버튼 1, COIN, START입니다.
+    왼쪽 D-pad는 누르고 있는 동안 계속 이동하며, 오른쪽 FIRE와 동시에 누를 수 있습니다. COIN 후 START를 누르세요.
   </aside>
   <pre id="error" aria-live="polite"></pre>
 </main>
@@ -79,6 +80,8 @@ body.running #preflight{display:none}
   }
 
   window.addEventListener("error", event => {
+    const message = String(event.error?.message || event.message || "");
+    if (/Wake Lock permission request denied/i.test(message)) return;
     if (loading) fail(event.error || event.message);
   });
 
@@ -92,21 +95,92 @@ body.running #preflight{display:none}
 
     window.EJS_player = "#game";
     window.EJS_core = "mame2003_plus";
-    window.EJS_gameName = "Robby Roto";
+    window.EJS_gameName = "robby";
     window.EJS_gameUrl = "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip";
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
     window.EJS_startOnLoaded = true;
     window.EJS_fullscreenOnLoaded = false;
     window.EJS_controlScheme = "mame";
-    window.EJS_gameID = "robby-roto-public-domain";
+    window.EJS_gameID = "robby";
     window.EJS_backgroundColor = "#000";
     window.EJS_disableAutoLang = true;
     window.EJS_language = "en-US";
     window.EJS_askBeforeExit = false;
     window.EJS_noAutoFocus = false;
-    if (matchMedia("(pointer: coarse)").matches) {
-      window.EJS_browserMode = "mobile";
-    }
+
+    window.EJS_VirtualGamepadSettings = [
+      {
+        type: "dpad",
+        location: "left",
+        left: "50%",
+        right: "50%",
+        joystickInput: false,
+        inputValues: [4, 5, 6, 7]
+      },
+      {
+        type: "button",
+        text: "FIRE",
+        id: "fire-b",
+        location: "right",
+        left: 24,
+        top: 26,
+        bold: true,
+        fontSize: 18,
+        input_value: 0
+      },
+      {
+        type: "button",
+        text: "FIRE 2",
+        id: "fire-a",
+        location: "right",
+        left: 102,
+        top: 84,
+        bold: true,
+        fontSize: 15,
+        input_value: 8
+      },
+      {
+        type: "button",
+        text: "COIN",
+        id: "coin",
+        location: "center",
+        left: -92,
+        fontSize: 14,
+        block: true,
+        input_value: 2
+      },
+      {
+        type: "button",
+        text: "START",
+        id: "start-game",
+        location: "center",
+        left: 5,
+        fontSize: 14,
+        block: true,
+        input_value: 3
+      }
+    ];
+
+    window.EJS_Buttons = {
+      playPause: true,
+      restart: true,
+      mute: true,
+      settings: true,
+      fullscreen: true,
+      saveState: false,
+      loadState: false,
+      screenRecord: false,
+      gamepad: true,
+      cheat: false,
+      volume: true,
+      saveSavFiles: false,
+      loadSavFiles: false,
+      quickSave: false,
+      quickLoad: false,
+      screenshot: true,
+      cacheManager: false,
+      exitEmulation: false
+    };
 
     window.EJS_onGameStart = () => {
       loading = false;
