@@ -1,6 +1,25 @@
 {
-  "result": "cancelled",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30224643731",
+  "result": "failure",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30223394797",
   "public_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
-  "details": {}
+  "details": {
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
+    "page_loaded": true,
+    "mode": "web-mame",
+    "game_canvas": false,
+    "mobile_controls": false,
+    "final_status": "",
+    "browser_errors": [],
+    "console": [
+      "log: Loading language ko-KR",
+      "error: Failed to load resource: the server responded with a status of 404 ()",
+      "log: Missing language ko-KR !!",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200084260000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
+      "warning: enlarged memory arrays from 16777216 to 33554432, took 3 ms (has ArrayBuffer.transfer? false)",
+      "warning: Failed to start game RuntimeError: unreachable\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[10377]:0x60c7a4\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[509]:0x6173e\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[10716]:0x64152f\n    at ret.<computed> (blob:https://ssyberlover-ai.github.io/fa30f8ec-12cf-42af-a0ea-378a5a18a8c0:13:235879)\n    at invoke_iii (blob:https://ssyberlover-ai.github.io/fa30f8ec-12cf-42af-a0ea-378a5a18a8c0:13:278644)\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[2278]:0x1def46\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[1885]:0x18ab06\n    at blob:https://ssyberlover-ai.github.io/61472cb5-e89f-4c67-b459-b331b2ab26dd:wasm-function[36354]:0xf39b52\n    at ret.<computed> (blob:https://ssyberlover-ai.github.io/fa30f8ec-12cf-42af-a0ea-378a5a18a8c0:13:235879)\n    at Object.callMain (blob:https://ssyberlover-ai.github.io/fa30f8ec-12cf-42af-a0ea-378a5a18a8c0:13:279331)",
+      "log: Failed to start game"
+    ],
+    "error": "page.waitForFunction: Timeout 240000ms exceeded.\n    at testArcadePage (/home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:34:14)\n    at async file:///home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:101:5"
+  }
 }
