@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Chat VM · DOS MAME</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;padding:10px;background:#0b1018;color:#eef4ff}
+main{max-width:960px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+h1{margin:0;font-size:18px}
+#status{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#7ef0a8;text-align:right}
+progress{width:100%;height:8px;margin-bottom:8px}
+.vm{padding:8px;background:#000;border:1px solid #34445e;border-radius:10px;overflow:auto}
+#screen_container{min-height:360px;display:grid;place-items:center;outline:none}
+#screen_container>div{white-space:pre;font:14px/14px ui-monospace,SFMono-Regular,Consolas,monospace;color:#ddd}
+#screen_container canvas{display:none;max-width:100%;height:auto;image-rendering:pixelated}
+.row,.pad{display:flex;justify-content:center;flex-wrap:wrap;gap:7px;margin-top:9px}
+button{min-height:42px;padding:7px 12px;border:1px solid #50678e;border-radius:9px;background:#17243b;color:#fff;font-weight:750;touch-action:manipulation}
+button:active{background:#36547f}
+button:disabled{opacity:.45}
+.pad button{min-width:55px;font-size:16px}
+.cmd{display:flex;gap:6px;margin-top:9px}
+.cmd input{flex:1;min-width:0;padding:9px;background:#101827;color:#fff;border:1px solid #50678e;border-radius:8px}
+.notice{margin-top:9px;padding:9px;border:1px solid #394c6b;border-radius:9px;background:#101827;font-size:12px;line-height:1.45}
+.small{font-size:11px;opacity:.76;text-align:center}
+#error{white-space:pre-wrap;color:#ff9b9b;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;max-height:180px;overflow:auto}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Chat VM · DOS MAME 0.37b14</h1>
+  <span id="status">초기화 중…</span>
+</header>
+
+<progress id="progress" max="100" value="0"></progress>
+
+<section class="vm">
+  <div id="screen_container" tabindex="0">
+    <div></div>
+    <canvas></canvas>
+  </div>
+</section>
+
+<div class="row">
+  <button id="run" disabled>Robby Roto 실행</button>
+  <button id="info" disabled>MAME 정보</button>
+  <button id="reboot" disabled>VM 재부팅</button>
+  <button id="full" disabled>전체화면</button>
+</div>
+
+<div class="pad">
+  <button data-key="up">▲</button>
+  <button data-key="left">◀</button>
+  <button data-key="enter">ENTER</button>
+  <button data-key="right">▶</button>
+  <button data-key="down">▼</button>
+
+  <button data-key="o">O</button>
+  <button data-key="k">K</button>
+  <button data-key="5">5 COIN</button>
+  <button data-key="1">1 START</button>
+  <button data-key="ctrl">CTRL</button>
+  <button data-key="alt">ALT</button>
+  <button data-key="space">SPACE</button>
+  <button data-key="esc">ESC</button>
+</div>
+
+<div class="cmd">
+  <input id="command" placeholder="DOS 명령 (예: dir, c:, mame -help)" disabled>
+  <button id="send" disabled>전송</button>
+</div>
+
+<div class="notice">
+  <strong>ROM 고지:</strong> 이 Preview는 상용 ROM을 포함하지 않습니다. Robby Roto는 권리자의 허가에 따라 MAMEdev가 비상업적 사용용으로 공개한 공식 ROM을 원본 MAMEdev GitHub 저장소에서 직접 불러옵니다.
+</div>
+
+<p class="small">MAME 경고 화면이 나오면 O → K 또는 좌우 방향키를 눌러 진행하세요. 게임 시작은 5 COIN → 1 START입니다.</p>
+<pre id="error"></pre>
+</main>
+
+<script>
+"use strict";
+
+const ASSETS = {
+  v86: "https://raw.githubusercontent.com/ssyberlover-ai/chat-vm-mame-runtime/main/runtime/v86_all.js",
+  mame: "https://raw.githubusercontent.com/ssyberlover-ai/chat-vm-mame-runtime/main/mame/m37b14b.zip",
+  bios: "https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/seabios.bin",
+  vga: "https://raw.githubusercontent.com/copy/v86/2f1346b0e7d88d4cbbbcc05fe15b4e369c3de23f/bios/vgabios.bin",
+  freedos: "https://raw.githubusercontent.com/copy/images/master/freedos722.img",
+  robbyApi: "https://api.github.com/repos/mamedev/www.mamedev.org/contents/roms/robby/robby.zip"
+};
+
+const $ = selector => document.querySelector(selector);
+const statusNode = $("#status");
+const progressNode = $("#progress");
+const errorNode = $("#error");
+
+function setStatus(text) {
+  statusNode.textContent = text;
+}
+
+function showError(error) {
+  console.error(error);
+  setStatus("실행 실패");
+  errorNode.textContent = error?.stack || String(error);
+}
+
+async function fetchBytes(url, label) {
+  setStatus(`${label} 다운로드…`);
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    redirect: "follow"
+  });
+
+  if (!response.ok) {
+    throw new Error(`${label}: HTTP ${response.status}\n${url}`);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  if (!bytes.length) {
+    throw new Error(`${label}: 빈 응답`);
+  }
+
+  return bytes;
+}
+
+async function fetchGitHubContent(url, label) {
+  setStatus(`${label} 다운로드…`);
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/vnd.github+json" },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`${label}: GitHub API HTTP ${response.status}`);
+  }
+
+  const payload = await response.json();
+
+  if (payload.encoding !== "base64" || !payload.content) {
+    throw new Error(`${label}: Base64 콘텐츠 없음`);
+  }
+
+  const clean = payload.content.replace(/\s/g, "");
+  return Uint8Array.from(atob(clean), character => character.charCodeAt(0));
+}
+
+async function installV86(sourceBytes) {
+  setStatus("v86 런타임 설치 중…");
+
+  const source = new TextDecoder().decode(sourceBytes);
+  const scriptUrl = URL.createObjectURL(
+    new Blob([source], { type: "text/javascript" })
+  );
+
+  try {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = scriptUrl;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("v86_all.js 실행 실패"));
+      document.head.appendChild(script);
+    });
+  } finally {
+    URL.revokeObjectURL(scriptUrl);
+  }
+
+  if (typeof window.V86Starter !== "function") {
+    throw new Error("V86Starter가 등록되지 않았습니다.");
+  }
+}
+
+async function inflate(bytes, format) {
+  const stream = new Blob([bytes])
+    .stream()
+    .pipeThrough(new DecompressionStream(format));
+
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function readZip(zipBytes) {
+  const view = new DataView(
+    zipBytes.buffer,
+    zipBytes.byteOffset,
+    zipBytes.byteLength
+  );
+
+  const decoder = new TextDecoder();
+  let eocd = -1;
+
+  for (
+    let offset = zipBytes.length - 22;
+    offset >= Math.max(0, zipBytes.length - 65557);
+    offset -= 1
+  ) {
+    if (view.getUint32(offset, true) === 0x06054b50) {
+      eocd = offset;
+      break;
+    }
+  }
+
+  if (eocd < 0) {
+    throw new Error("MAME ZIP 종료 레코드를 찾지 못했습니다.");
+  }
+
+  const count = view.getUint16(eocd + 10, true);
+  let central = view.getUint32(eocd + 16, true);
+  const files = [];
+
+  for (let index = 0; index < count; index += 1) {
+    if (view.getUint32(central, true) !== 0x02014b50) {
+      throw new Error("MAME ZIP 중앙 디렉터리가 손상됐습니다.");
+    }
+
+    const method = view.getUint16(central + 10, true);
+    const compressedSize = view.getUint32(central + 20, true);
+    const uncompressedSize = view.getUint32(central + 24, true);
+    const nameLength = view.getUint16(central + 28, true);
+    const extraLength = view.getUint16(central + 30, true);
+    const commentLength = view.getUint16(central + 32, true);
+    const localOffset = view.getUint32(central + 42, true);
+
+    const name = decoder.decode(
+      zipBytes.subarray(central + 46, central + 46 + nameLength)
+    );
+
+    if (!name.endsWith("/")) {
+      if (view.getUint32(localOffset, true) !== 0x04034b50) {
+        throw new Error(`잘못된 ZIP 로컬 헤더: ${name}`);
+      }
+
+      const localNameLength = view.getUint16(localOffset + 26, true);
+      const localExtraLength = view.getUint16(localOffset + 28, true);
+      const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+      const compressed = zipBytes.slice(dataStart, dataStart + compressedSize);
+
+      let data;
+
+      if (method === 0) {
+        data = compressed;
+      } else if (method === 8) {
+        data = await inflate(compressed, "deflate-raw");
+      } else {
+        throw new Error(`지원하지 않는 ZIP 압축 방식 ${method}: ${name}`);
+      }
+
+      if (data.length !== uncompressedSize) {
+        throw new Error(`ZIP 크기 불일치: ${name}`);
+      }
+
+      files.push({ name, data });
+    }
+
+    central += 46 + nameLength + extraLength + commentLength;
+  }
+
+  return files;
+}
+
+function put16(bytes, offset, value) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function put32(bytes, offset, value) {
+  put16(bytes, offset, value & 0xffff);
+  put16(bytes, offset + 2, Math.floor(value / 65536));
+}
+
+function putAscii(bytes, offset, text, length) {
+  for (let index = 0; index < length; index += 1) {
+    bytes[offset + index] = index < text.length
+      ? text.charCodeAt(index) & 0xff
+      : 0x20;
+  }
+}
+
+function dos83(name, used) {
+  const filename = name.replace(/^.*[\\/]/, "").toUpperCase();
+  const dot = filename.lastIndexOf(".");
+  const invalid = /[^A-Z0-9_$~!#%&'()@^`{}-]/g;
+
+  const base = (dot > 0 ? filename.slice(0, dot) : filename)
+    .replace(invalid, "_") || "FILE";
+
+  const extension = (dot > 0 ? filename.slice(dot + 1) : "")
+    .replace(invalid, "_")
+    .slice(0, 3);
+
+  for (let suffixIndex = 0; suffixIndex < 1000; suffixIndex += 1) {
+    const suffix = suffixIndex ? `~${suffixIndex}` : "";
+    const stem = (base.slice(0, 8 - suffix.length) + suffix).slice(0, 8);
+    const key = stem.padEnd(8) + extension.padEnd(3);
+
+    if (!used.has(key)) {
+      used.add(key);
+      return { stem, extension };
+    }
+  }
+
+  throw new Error(`8.3 이름 충돌: ${name}`);
+}
+
+function makeFat16Disk(rootFiles, romFiles) {
+  const bytesPerSector = 512;
+  const sectorsPerCluster = 4;
+  const partitionStart = 63;
+  const totalSectors = 64 * 2048;
+  const partitionSectors = totalSectors - partitionStart;
+  const rootEntryCount = 512;
+  const rootSectors = Math.ceil(rootEntryCount * 32 / bytesPerSector);
+  const reservedSectors = 1;
+  const fatCount = 2;
+
+  let fatSectors = 1;
+  let clusterCount = 0;
+
+  for (let iteration = 0; iteration < 10; iteration += 1) {
+    clusterCount = Math.floor(
+      (partitionSectors - reservedSectors - fatCount * fatSectors - rootSectors) /
+      sectorsPerCluster
+    );
+
+    fatSectors = Math.ceil((clusterCount + 2) * 2 / bytesPerSector);
+  }
+
+  const disk = new Uint8Array(totalSectors * bytesPerSector);
+  const partitionEntry = 446;
+
+  disk[partitionEntry] = 0x00;
+  disk[partitionEntry + 1] = 0x01;
+  disk[partitionEntry + 2] = 0x01;
+  disk[partitionEntry + 3] = 0x00;
+  disk[partitionEntry + 4] = 0x06;
+  disk[partitionEntry + 5] = 0xfe;
+  disk[partitionEntry + 6] = 0xff;
+  disk[partitionEntry + 7] = 0xff;
+  put32(disk, partitionEntry + 8, partitionStart);
+  put32(disk, partitionEntry + 12, partitionSectors);
+  disk[510] = 0x55;
+  disk[511] = 0xaa;
+
+  const boot = partitionStart * bytesPerSector;
+  disk.set([0xeb, 0x3c, 0x90], boot);
+  putAscii(disk, boot + 3, "MSDOS5.0", 8);
+  put16(disk, boot + 11, bytesPerSector);
+  disk[boot + 13] = sectorsPerCluster;
+  put16(disk, boot + 14, reservedSectors);
+  disk[boot + 16] = fatCount;
+  put16(disk, boot + 17, rootEntryCount);
+  put16(disk, boot + 19, 0);
+  disk[boot + 21] = 0xf8;
+  put16(disk, boot + 22, fatSectors);
+  put16(disk, boot + 24, 63);
+  put16(disk, boot + 26, 16);
+  put32(disk, boot + 28, partitionStart);
+  put32(disk, boot + 32, partitionSectors);
+  disk[boot + 36] = 0x80;
+  disk[boot + 38] = 0x29;
+  put32(disk, boot + 39, 0x4d414d45);
+  putAscii(disk, boot + 43, "CHAT MAME  ", 11);
+  putAscii(disk, boot + 54, "FAT16   ", 8);
+  disk[boot + 510] = 0x55;
+  disk[boot + 511] = 0xaa;
+
+  const fatStart = partitionStart + reservedSectors;
+  const rootStart = fatStart + fatCount * fatSectors;
+  const dataStart = rootStart + rootSectors;
+  const fat = new Uint16Array(fatSectors * bytesPerSector / 2);
+  fat[0] = 0xfff8;
+  fat[1] = 0xffff;
+
+  let nextCluster = 2;
+  const clusterBytes = sectorsPerCluster * bytesPerSector;
+
+  function allocate(length) {
+    const count = Math.max(1, Math.ceil(length / clusterBytes));
+    const first = nextCluster;
+
+    for (let index = 0; index < count; index += 1) {
+      fat[nextCluster] = index === count - 1 ? 0xffff : nextCluster + 1;
+      nextCluster += 1;
+    }
+
+    if (nextCluster > clusterCount + 2) {
+      throw new Error("FAT16 디스크 용량이 부족합니다.");
+    }
+
+    return { first, count };
+  }
+
+  const clusterOffset = cluster =>
+    (dataStart + (cluster - 2) * sectorsPerCluster) * bytesPerSector;
+
+  const usedRoot = new Set();
+  const usedRom = new Set();
+
+  const rootEntries = rootFiles.map(file => ({
+    ...file,
+    ...dos83(file.name, usedRoot),
+    allocation: allocate(file.data.length)
+  }));
+
+  const romDirectory = allocate(clusterBytes);
+
+  const romEntries = romFiles.map(file => ({
+    ...file,
+    ...dos83(file.name, usedRom),
+    allocation: allocate(file.data.length)
+  }));
+
+  function writeEntry(offset, name, attribute, firstCluster, size) {
+    putAscii(disk, offset, name.stem, 8);
+    putAscii(disk, offset + 8, name.extension || "", 3);
+    disk[offset + 11] = attribute;
+    put16(disk, offset + 26, firstCluster);
+    put32(disk, offset + 28, size);
+  }
+
+  let rootOffset = rootStart * bytesPerSector;
+  writeEntry(rootOffset, { stem: "ROMS", extension: "" }, 0x10, romDirectory.first, 0);
+  rootOffset += 32;
+
+  for (const file of rootEntries) {
+    writeEntry(rootOffset, file, 0x20, file.allocation.first, file.data.length);
+    rootOffset += 32;
+    disk.set(file.data, clusterOffset(file.allocation.first));
+  }
+
+  let romOffset = clusterOffset(romDirectory.first);
+  writeEntry(romOffset, { stem: ".", extension: "" }, 0x10, romDirectory.first, 0);
+  writeEntry(romOffset + 32, { stem: "..", extension: "" }, 0x10, 0, 0);
+  romOffset += 64;
+
+  for (const file of romEntries) {
+    writeEntry(romOffset, file, 0x20, file.allocation.first, file.data.length);
+    romOffset += 32;
+    disk.set(file.data, clusterOffset(file.allocation.first));
+  }
+
+  const fatBytes = new Uint8Array(fat.buffer);
+
+  for (let fatIndex = 0; fatIndex < fatCount; fatIndex += 1) {
+    disk.set(
+      fatBytes.subarray(0, fatSectors * bytesPerSector),
+      (fatStart + fatIndex * fatSectors) * bytesPerSector
+    );
+  }
+
+  return disk;
+}
+
+let emulator = null;
+let prepared = null;
+
+async function prepareAssets() {
+  progressNode.value = 5;
+
+  const runtimeBytes = await fetchBytes(ASSETS.v86, "v86 런타임");
+  await installV86(runtimeBytes);
+  progressNode.value = 20;
+
+  const [mameZip, bios, vga, freedos, robby] = await Promise.all([
+    fetchBytes(ASSETS.mame, "DOS MAME"),
+    fetchBytes(ASSETS.bios, "SeaBIOS"),
+    fetchBytes(ASSETS.vga, "VGA BIOS"),
+    fetchBytes(ASSETS.freedos, "FreeDOS"),
+    fetchGitHubContent(ASSETS.robbyApi, "Robby Roto ROM")
+  ]);
+
+  progressNode.value = 55;
+  setStatus("MAME 아카이브 해제 중…");
+
+  const allFiles = await readZip(mameZip);
+  const mameFiles = allFiles
+    .filter(file => /\.(exe|com|cfg|dat|txt)$/i.test(file.name))
+    .map(file => ({ name: file.name.replace(/^.*[\\/]/, ""), data: file.data }));
+
+  if (!mameFiles.some(file => /^mame\.exe$/i.test(file.name))) {
+    throw new Error("검증된 아카이브에서 MAME.EXE를 찾지 못했습니다.");
+  }
+
+  prepared = {
+    bios,
+    vga,
+    freedos,
+    disk: makeFat16Disk(mameFiles, [{ name: "robby.zip", data: robby }])
+  };
+
+  progressNode.value = 75;
+}
+
+async function bootVm() {
+  if (!prepared) {
+    throw new Error("VM 자산이 아직 준비되지 않았습니다.");
+  }
+
+  if (emulator) {
+    try {
+      await emulator.stop();
+      emulator.destroy();
+    } catch {
+      // 이전 인스턴스 정리 실패는 새 부팅을 막지 않습니다.
+    }
+  }
+
+  errorNode.textContent = "";
+  setStatus("FreeDOS VM 부팅 중…");
+
+  emulator = new V86Starter({
+    memory_size: 128 * 1024 * 1024,
+    vga_memory_size: 8 * 1024 * 1024,
+    screen_container: $("#screen_container"),
+    bios: { buffer: prepared.bios.buffer },
+    vga_bios: { buffer: prepared.vga.buffer },
+    fda: { buffer: prepared.freedos.buffer },
+    hda: { buffer: prepared.disk.buffer },
+    boot_order: 0x321,
+    autostart: true,
+    disable_mouse: true,
+    disable_speaker: true
+  });
+
+  window.mameVm = emulator;
+
+  emulator.add_listener("emulator-ready", () => {
+    setStatus("VM 실행 중 · FreeDOS 부팅 대기");
+  });
+
+  const markReady = () => {
+    setStatus("FreeDOS 준비 예상 · Robby Roto 실행 가능");
+    progressNode.value = 100;
+    setTimeout(() => { progressNode.style.display = "none"; }, 500);
+
+    ["#run", "#info", "#reboot", "#full", "#command", "#send"]
+      .forEach(selector => { $(selector).disabled = false; });
+  };
+
+  if (typeof emulator.wait_until_vga_screen_contains === "function") {
+    emulator.wait_until_vga_screen_contains("A:\\>")
+      .then(markReady)
+      .catch(() => setTimeout(markReady, 15000));
+  } else {
+    setTimeout(markReady, 15000);
+  }
+
+  $("#screen_container").focus();
+}
+
+function typeText(text) {
+  if (!emulator) return;
+  emulator.keyboard_send_text(text, 20);
+  $("#screen_container").focus();
+}
+
+$("#run").onclick = () => {
+  typeText("C:\nMAME.EXE ROBBY -ROMPATH C:\\ROMS -SOUNDCARD 0\n");
+  setStatus("Robby Roto 실행 명령 전송");
+};
+
+$("#info").onclick = () => {
+  typeText("C:\nMAME.EXE -HELP\n");
+};
+
+$("#reboot").onclick = () => bootVm().catch(showError);
+$("#full").onclick = () => emulator?.screen_go_fullscreen();
+
+$("#send").onclick = () => {
+  typeText($("#command").value + "\n");
+  $("#command").value = "";
+};
+
+$("#command").onkeydown = event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    $("#send").click();
+  }
+};
+
+const scanCodes = {
+  up: [0xe0, 0x48, 0xe0, 0xc8],
+  down: [0xe0, 0x50, 0xe0, 0xd0],
+  left: [0xe0, 0x4b, 0xe0, 0xcb],
+  right: [0xe0, 0x4d, 0xe0, 0xcd],
+  enter: [0x1c, 0x9c],
+  esc: [0x01, 0x81],
+  ctrl: [0x1d, 0x9d],
+  alt: [0x38, 0xb8],
+  space: [0x39, 0xb9],
+  "1": [0x02, 0x82],
+  "5": [0x06, 0x86],
+  o: [0x18, 0x98],
+  k: [0x25, 0xa5]
+};
+
+for (const button of document.querySelectorAll("[data-key]")) {
+  button.onpointerdown = event => {
+    event.preventDefault();
+    emulator?.keyboard_send_scancodes(scanCodes[button.dataset.key], 15);
+    $("#screen_container").focus();
+  };
+}
+
+(async () => {
+  try {
+    await prepareAssets();
+    await bootVm();
+  } catch (error) {
+    showError(error);
+  }
+})();
+</script>
+</body>
+</html>
