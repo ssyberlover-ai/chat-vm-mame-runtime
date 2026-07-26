@@ -1,9 +1,9 @@
 {
   "result": "success",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30225542144",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30225656833",
   "public_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
   "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30225542144",
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30225656833",
     "page_loaded": true,
     "mode": "web-mame",
     "game_canvas": true,
@@ -36,9 +36,9 @@
       "log: Translation not found for '+1'. Language set to 'en-US'",
       "log: Translation not found for 'FIRE 2'. Language set to 'en-US'",
       "log: Translation not found for 'COIN'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000242E0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200024220000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
       "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
-      "warning: enlarged memory arrays from 16777216 to 33554432, took 4 ms (has ArrayBuffer.transfer? false)",
+      "warning: enlarged memory arrays from 16777216 to 33554432, took 3 ms (has ArrayBuffer.transfer? false)",
       "log: Translation not found for 'Core (Requires restart)'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Source'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Format'. Language set to 'en-US'",
@@ -54,11 +54,11 @@
       "log: Translation not found for 'Direct Keyboard Input'. Language set to 'en-US'",
       "log: Translation not found for 'Forward Alt key'. Language set to 'en-US'",
       "log: Translation not found for 'Lock Mouse'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000242E0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: [.WebGL-0x3a54006f7f00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x3a54006f7f00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x3a54006f7f00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x3a54006f7f00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200024220000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
     ]
   }
 }
