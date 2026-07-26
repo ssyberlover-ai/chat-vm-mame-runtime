@@ -1,10 +1,11 @@
 {
   "result": "failure",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30221794058",
-  "public_url": "https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/main/site/index.html",
-  "tested_url": "https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/710ea5abac119825d40d13701bcd098afea357a4/site/index.html",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30222052629",
+  "public_url": "https://cdn.jsdelivr.net/gh/ssyberlover-ai/chat-vm-mame-runtime@main/site/index.html",
+  "tested_url": "https://cdn.jsdelivr.net/gh/ssyberlover-ai/chat-vm-mame-runtime@c9dfb6e60d0231a8b579dab640a0e7b4bc5e3982/site/index.html",
   "details": {
-    "target_url": "https://raw.githack.com/ssyberlover-ai/chat-vm-mame-runtime/710ea5abac119825d40d13701bcd098afea357a4/site/index.html",
+    "target_url": "https://cdn.jsdelivr.net/gh/ssyberlover-ai/chat-vm-mame-runtime@c9dfb6e60d0231a8b579dab640a0e7b4bc5e3982/site/index.html",
+    "interstitial_passed": false,
     "page_loaded": true,
     "dos_prompt": false,
     "vm_ready": false,
@@ -13,9 +14,7 @@
     "screen_before_launch": "",
     "screen_after_launch": "",
     "browser_errors": [],
-    "console": [
-      "error: Failed to load resource: net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin"
-    ],
-    "error": "page.check: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#agree')\n\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:33:14"
+    "console": [],
+    "error": "page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('#agree') to be visible\n\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:43:14"
   }
 }
