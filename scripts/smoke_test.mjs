@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { writeFile } from "node:fs/promises";
 
+const targetUrl = process.env.SMOKE_URL || "http://127.0.0.1:8000/index.html";
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 430, height: 900 } });
 const browserErrors = [];
@@ -10,6 +11,7 @@ page.on("pageerror", error => browserErrors.push(error.stack || String(error)));
 page.on("console", message => consoleLines.push(`${message.type()}: ${message.text()}`));
 
 const result = {
+  target_url: targetUrl,
   page_loaded: false,
   dos_prompt: false,
   vm_ready: false,
@@ -22,7 +24,7 @@ const result = {
 };
 
 try {
-  await page.goto("http://127.0.0.1:8000/index.html", {
+  await page.goto(targetUrl, {
     waitUntil: "networkidle",
     timeout: 60000
   });
