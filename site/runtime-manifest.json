@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-26T22:48:53.010642+00:00",
+  "generated_at": "2026-07-26T22:58:23.563846+00:00",
   "v86_version": "0.5.424",
   "controller": "site/emulator-v2.js",
   "dpmi": {
@@ -30,11 +30,11 @@
     },
     "site/images/mame-hda.img": {
       "bytes": 33554432,
-      "sha256": "cd5120c8e42075fa44afe09da96578784a4f294ac5470204e7ad473419f48dae"
+      "sha256": "7f845819e9519b20d791e2999d7d4943afe1a3d895cb6d3752df4ba7a89e156f"
     },
     "site/images/mame-hda.img.gz": {
-      "bytes": 2649748,
-      "sha256": "c081d19a96a16a370c86a06ac338644f799a78157cd49ea878ea46dee9b8b912"
+      "bytes": 2649749,
+      "sha256": "2b55f9c9c813127eab3ea36711cacdc58743e66393381dc0a59b5e440402f4c6"
     }
   }
 }
