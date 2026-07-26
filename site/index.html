@@ -168,5 +168,26 @@ if (typeof window.V86 !== "function") {
   };
 })();
 </script>
+<script>
+"use strict";
+(() => {
+  const runButton = document.querySelector("#run");
+  runButton?.addEventListener("click", event => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const vm = window.mameVm;
+    if (!vm) return;
+    vm.keyboard_send_text(
+      "C:\n" +
+      "MAME.EXE ROBBY -ROMPATH D:\\ -SOUNDCARD 0 " +
+      "-VESA -VESAMODE VESA2L -RESOLUTION 640X480 -DEPTH 16 " +
+      "-NOSCANLINES -STRETCH -STEADYKEY\n"
+    );
+    const status = document.querySelector("#status");
+    if (status) status.textContent = "Robby Roto 실행 중 · VESA2L 16-bit";
+    document.querySelector("#screen_container")?.focus();
+  }, true);
+})();
+</script>
 </body>
 </html>
