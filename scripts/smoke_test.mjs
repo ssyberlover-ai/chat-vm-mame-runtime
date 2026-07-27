@@ -19,7 +19,10 @@ page.on("console", message => consoleLines.push(`${message.type()}: ${message.te
 const result = {
   target_url: targetUrl,
   page_loaded: false,
-  mode: "unknown",
+  mode: "web-emulator",
+  selected_game: "",
+  selected_core: "",
+  hosted_rom: false,
   game_canvas: false,
   mobile_controls: false,
   visible_control_labels: [],
@@ -37,7 +40,7 @@ function fatalBrowserErrors() {
   );
 }
 
-async function waitForArcadeCanvas(timeoutMs = 240000) {
+async function waitForCanvas(timeoutMs = 240000) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const state = await page.evaluate(() => {
@@ -57,37 +60,55 @@ async function waitForArcadeCanvas(timeoutMs = 240000) {
     if (state.canvas) return;
     await sleep(400);
   }
-  throw new Error("Timed out waiting for the WebAssembly MAME canvas");
+  throw new Error("Timed out waiting for the WebAssembly emulator canvas");
 }
 
-async function readVisibleControls() {
-  return page.evaluate(() => {
-    const wanted = ["FIRE", "FIRE 2", "COIN", "START"];
+async function visibleLabels(wanted) {
+  return page.evaluate(labels => {
     const visibleText = [...document.querySelectorAll("#game *")]
       .filter(element => {
         const rect = element.getBoundingClientRect();
         const style = getComputedStyle(element);
-        return rect.width > 18 &&
-          rect.height > 18 &&
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
+        return rect.width > 18 && rect.height > 18 &&
+          style.display !== "none" && style.visibility !== "hidden" &&
           Number(style.opacity || 1) > 0;
       })
       .map(element => (element.textContent || "").trim())
       .filter(Boolean);
-    return wanted.filter(label => visibleText.some(text => text === label || text.includes(label)));
-  });
+    return labels.filter(label => visibleText.some(text => text === label || text.includes(label)));
+  }, wanted);
 }
 
-async function testArcadePage() {
-  result.mode = "web-mame";
-  if (await page.locator("#agree").count()) {
-    await page.check("#agree");
+try {
+  await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 60000 });
+  result.page_loaded = true;
+
+  await page.waitForFunction(() => {
+    const checked = document.querySelector('#catalog input[name="game"]:checked');
+    const status = document.querySelector("#status")?.textContent || "";
+    return Boolean(checked) && !status.includes("불러오는 중");
+  }, null, { timeout: 60000, polling: 250 });
+
+  const selectedBeforeLaunch = await page.locator('#catalog input[name="game"]:checked').inputValue();
+  if (selectedBeforeLaunch !== "cybercoaster") {
+    throw new Error(`Expected default hosted ROM cybercoaster, got ${selectedBeforeLaunch}`);
   }
+
+  await page.check("#agree");
   await page.click("#launch");
-  await waitForArcadeCanvas();
+  await waitForCanvas();
   await page.setViewportSize({ width: 900, height: 430 });
-  await page.waitForTimeout(1800);
+  await page.waitForTimeout(2200);
+
+  const diagnostics = await page.evaluate(() => window.webEmulatorDiagnostics || null);
+  if (!diagnostics?.ready) throw new Error("Runtime diagnostics were not initialized");
+  result.selected_game = diagnostics.id;
+  result.selected_core = diagnostics.core;
+  result.hosted_rom = Boolean(diagnostics.hosted);
+
+  if (result.selected_game !== "cybercoaster" || result.selected_core !== "fceumm" || !result.hosted_rom) {
+    throw new Error(`Unexpected runtime selection: ${JSON.stringify(diagnostics)}`);
+  }
 
   result.final_status = await page.locator("#status").textContent();
   const errorText = await page.locator("#error").textContent();
@@ -95,20 +116,15 @@ async function testArcadePage() {
     throw new Error(errorText || result.final_status);
   }
 
-  result.game_canvas = await page.evaluate(() => {
-    const canvases = [...document.querySelectorAll("#game canvas")];
-    return canvases.some(canvas =>
-      canvas.width > 0 &&
-      canvas.height > 0 &&
-      getComputedStyle(canvas).display !== "none"
-    );
-  });
-  if (!result.game_canvas) {
-    throw new Error("EmulatorJS game canvas was not detected");
-  }
+  result.game_canvas = await page.evaluate(() =>
+    [...document.querySelectorAll("#game canvas")].some(canvas =>
+      canvas.width > 0 && canvas.height > 0 && getComputedStyle(canvas).display !== "none"
+    )
+  );
+  if (!result.game_canvas) throw new Error("EmulatorJS game canvas was not detected");
 
-  await page.waitForFunction(() => {
-    const wanted = ["FIRE", "COIN", "START"];
+  const expectedControls = ["A", "B", "SELECT", "START"];
+  await page.waitForFunction(labels => {
     const visibleText = [...document.querySelectorAll("#game *")]
       .filter(element => {
         const rect = element.getBoundingClientRect();
@@ -117,70 +133,29 @@ async function testArcadePage() {
           style.display !== "none" && style.visibility !== "hidden";
       })
       .map(element => (element.textContent || "").trim());
-    return wanted.every(label => visibleText.some(text => text === label || text.includes(label)));
-  }, null, { timeout: 30000, polling: 300 });
+    return labels.every(label => visibleText.some(text => text === label || text.includes(label)));
+  }, expectedControls, { timeout: 30000, polling: 300 });
 
-  result.visible_control_labels = await readVisibleControls();
+  result.visible_control_labels = await visibleLabels(expectedControls);
   result.virtual_gamepad_display = await page.evaluate(() => {
     const gamepad = window.EJS_emulator?.virtualGamepad;
     return gamepad ? getComputedStyle(gamepad).display : "missing";
   });
-  result.mobile_controls = ["FIRE", "COIN", "START"]
-    .every(label => result.visible_control_labels.includes(label));
+  result.mobile_controls = expectedControls.every(label => result.visible_control_labels.includes(label));
   if (!result.mobile_controls) {
-    throw new Error(
-      `Custom mobile controls were not all visible: ${JSON.stringify(result.visible_control_labels)}`
-    );
+    throw new Error(`Console controls were not all visible: ${JSON.stringify(result.visible_control_labels)}`);
   }
 
-  for (const label of ["COIN", "START"]) {
-    const button = page.getByText(label, { exact: true }).last();
-    if (await button.count()) {
-      await button.tap({ timeout: 10000 }).catch(() => button.click());
-      await page.waitForTimeout(600);
-    }
+  const startButton = page.getByText("START", { exact: true }).last();
+  if (await startButton.count()) {
+    await startButton.tap({ timeout: 10000 }).catch(() => startButton.click());
+    await page.waitForTimeout(1000);
   }
 
   const fatal = fatalBrowserErrors();
-  if (fatal.length) {
-    throw new Error(`Browser errors detected:\n${fatal.join("\n\n")}`);
-  }
+  if (fatal.length) throw new Error(`Browser errors detected:\n${fatal.join("\n\n")}`);
 
   await page.screenshot({ path: "smoke-mame.png", fullPage: true });
-}
-
-async function testLegacyVmPage() {
-  result.mode = "legacy-v86";
-  await page.check("#agree");
-  await page.click("#start");
-  await page.waitForFunction(() => {
-    const text = window.chatVmDiagnostics?.screenText || "";
-    const status = window.chatVmDiagnostics?.status || "";
-    return /A:\\?>/i.test(text) || status.includes("실행 실패");
-  }, null, { timeout: 150000, polling: 250 });
-  const status = await page.locator("#status").textContent();
-  if (status.includes("실행 실패")) throw new Error(await page.locator("#error").textContent());
-  await page.click("#run");
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector("#screen_container canvas");
-    return Boolean(canvas && getComputedStyle(canvas).display !== "none" && canvas.width > 0 && canvas.height > 0);
-  }, null, { timeout: 180000, polling: 250 });
-  result.game_canvas = true;
-  result.final_status = await page.locator("#status").textContent();
-  await page.screenshot({ path: "smoke-mame.png", fullPage: true });
-}
-
-try {
-  await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 60000 });
-  result.page_loaded = true;
-
-  if (await page.locator("#launch").count()) {
-    await testArcadePage();
-  } else if (await page.locator("#agree").count()) {
-    await testLegacyVmPage();
-  } else {
-    throw new Error("No supported emulator page entry point was found");
-  }
 } catch (error) {
   result.error = error.stack || String(error);
   await page.screenshot({ path: "smoke-failure.png", fullPage: true }).catch(() => {});
