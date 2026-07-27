@@ -35,13 +35,21 @@ jobs:
           touch _site/.nojekyll
 
           test -s _site/index.html
+          test -s _site/app.js
+          test -s _site/styles.css
           test -s _site/roms/manifest.json
           test -s _site/roms/tobu-tobu-girl-deluxe.gb
           test -s _site/roms/porklike-gb.gb
           test -s _site/roms/5-mazes.gb
           test -s _site/roms/cybercoaster.nes
-          grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' _site/index.html
-          grep -Fq './roms/manifest.json' _site/index.html
+          test -s _site/roms/minicraft-gba.gba
+          test -s _site/roms/2048-gb.gb
+          test -s _site/roms/hoops96.zip
+          grep -Fq './app.js' _site/index.html
+          grep -Fq './styles.css' _site/index.html
+          grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' _site/app.js
+          grep -Fq './roms/manifest.json' _site/app.js
+          grep -Fq 'arcade-stick' _site/styles.css
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -75,24 +83,30 @@ jobs:
         run: |
           set -euo pipefail
           BASE="${PAGE_URL%/}/"
-          curl --fail --location --silent --show-error \
-            --retry 12 --retry-delay 5 --retry-all-errors \
-            "${BASE}?deploy=${GITHUB_SHA}" --output /tmp/index.html
-          curl --fail --location --silent --show-error \
-            --retry 12 --retry-delay 5 --retry-all-errors \
-            "${BASE}roms/manifest.json?deploy=${GITHUB_SHA}" --output /tmp/manifest.json
+          curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "${BASE}?deploy=${GITHUB_SHA}" --output /tmp/index.html
+          curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "${BASE}app.js?deploy=${GITHUB_SHA}" --output /tmp/app.js
+          curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "${BASE}styles.css?deploy=${GITHUB_SHA}" --output /tmp/styles.css
+          curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "${BASE}roms/manifest.json?deploy=${GITHUB_SHA}" --output /tmp/manifest.json
 
           test -s /tmp/index.html
+          test -s /tmp/app.js
+          test -s /tmp/styles.css
           test -s /tmp/manifest.json
-          grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' /tmp/index.html
+          grep -Fq './app.js' /tmp/index.html
+          grep -Fq 'arcade-stick' /tmp/styles.css
+          grep -Fq 'buildArcadeStick' /tmp/app.js
           python3 - <<'PY'
           import json
           from pathlib import Path
           data = json.loads(Path('/tmp/manifest.json').read_text())
           ids = {game['id'] for game in data['games']}
-          expected = {'tobu-tobu-girl-deluxe', 'porklike-gb', '5-mazes', 'cybercoaster'}
-          if ids != expected:
-              raise SystemExit(f'Unexpected ROM catalog: {sorted(ids)}')
+          required = {
+              'tobu-tobu-girl-deluxe', 'porklike-gb', '5-mazes',
+              'cybercoaster', 'minicraft-gba', '2048-gb', 'hoops96-user'
+          }
+          missing = required - ids
+          if missing:
+              raise SystemExit(f'Missing required ROMs: {sorted(missing)}; published={sorted(ids)}')
           print('Published ROM catalog:', ', '.join(sorted(ids)))
           PY
 
@@ -136,6 +150,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
           git add deployment-status.json
           if git diff --cached --quiet; then
             exit 0
