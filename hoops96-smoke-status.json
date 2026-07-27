@@ -1,8 +1,8 @@
 {
   "result": "failure",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30232179272",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30232972167",
   "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user&test=30232179272",
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user&test=30232972167",
     "selected_game": null,
     "selected_core": null,
     "canvas": false,
@@ -12,11 +12,14 @@
     "released_inputs": false,
     "service_switch_sent": false,
     "screen_changed_after_service": false,
+    "portrait_controls_separated": false,
+    "portrait_no_horizontal_overflow": false,
+    "portrait_controls_inside_viewport": false,
     "final_status": "",
     "console": [
       "error: Failed to load resource: the server responded with a status of 404 ()"
     ],
     "page_errors": [],
-    "error": "page.waitForFunction: Timeout 90000ms exceeded.\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test_user_rom.mjs:40:14"
+    "error": "page.waitForFunction: Timeout 90000ms exceeded.\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test_user_rom.mjs:43:14"
   }
 }
