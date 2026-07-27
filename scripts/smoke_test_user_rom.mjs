@@ -48,8 +48,13 @@ try {
   if (errorText || result.final_status.includes("실행 실패")) {
     throw new Error(errorText || result.final_status);
   }
-  if (consoleLines.some(line => /Failed to start game|missing required files|not found/i.test(line))) {
-    throw new Error(`Core reported a ROM loading problem:\n${consoleLines.join("\n")}`);
+
+  const romErrorLines = consoleLines.filter(line =>
+    !/Translation not found/i.test(line) &&
+    /Failed to start game|missing required files|ROM loading (?:problem|failed)|(?:ROM|file).{0,40}not found/i.test(line)
+  );
+  if (romErrorLines.length) {
+    throw new Error(`Core reported a ROM loading problem:\n${romErrorLines.join("\n")}`);
   }
 
   const diagnostics = await page.evaluate(() => window.webEmulatorDiagnostics || null);
@@ -78,6 +83,10 @@ try {
       .map(element => (element.textContent || "").trim());
     return labels.filter(label => visible.some(text => text === label || text.includes(label)));
   }, expected);
+
+  if (!expected.every(label => result.controls.includes(label))) {
+    throw new Error(`Arcade controls were not all visible: ${JSON.stringify(result.controls)}`);
+  }
 
   const fatalErrors = pageErrors.filter(message => !/Wake Lock permission request denied/i.test(message));
   if (fatalErrors.length) throw new Error(`Browser errors:\n${fatalErrors.join("\n\n")}`);
