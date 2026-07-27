@@ -1,44 +1,25 @@
 {
-  "result": "success",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30225656833",
+  "result": "failure",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30226747020",
   "public_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/",
   "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30225656833",
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?browser-test=30226747020",
     "page_loaded": true,
     "mode": "web-mame",
     "game_canvas": true,
-    "mobile_controls": true,
-    "visible_control_labels": [
-      "FIRE",
-      "FIRE 2",
-      "COIN",
-      "START"
-    ],
-    "virtual_gamepad_display": "block",
-    "final_status": "게임 실행 중",
+    "mobile_controls": false,
+    "visible_control_labels": [],
+    "virtual_gamepad_display": "",
+    "final_status": "Cybercoaster 실행 중",
     "browser_errors": [
       "NotAllowedError: Wake Lock permission request denied"
     ],
     "console": [
       "log: Loading language en-US",
       "log: Translation not found for 'Exit Emulation'. Language set to 'en-US'",
-      "log: Translation not found for 'LEFT_BOTTOM_SHOULDER'. Language set to 'en-US'",
-      "log: Translation not found for 'RIGHT_BOTTOM_SHOULDER'. Language set to 'en-US'",
-      "log: Translation not found for 'LEFT_STICK'. Language set to 'en-US'",
-      "log: Translation not found for 'RIGHT_STICK'. Language set to 'en-US'",
-      "log: Translation not found for '-1'. Language set to 'en-US'",
-      "log: Translation not found for '+1'. Language set to 'en-US'",
-      "log: Translation not found for '-1'. Language set to 'en-US'",
-      "log: Translation not found for '+1'. Language set to 'en-US'",
-      "log: Translation not found for '-1'. Language set to 'en-US'",
-      "log: Translation not found for '+1'. Language set to 'en-US'",
-      "log: Translation not found for '-1'. Language set to 'en-US'",
-      "log: Translation not found for '+1'. Language set to 'en-US'",
-      "log: Translation not found for 'FIRE 2'. Language set to 'en-US'",
-      "log: Translation not found for 'COIN'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200024220000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
-      "warning: enlarged memory arrays from 16777216 to 33554432, took 3 ms (has ArrayBuffer.transfer? false)",
+      "log: Translation not found for 'SWAP DISKS'. Language set to 'en-US'",
+      "log: Translation not found for 'EJECT/INSERT DISK'. Language set to 'en-US'",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000FC080000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
       "log: Translation not found for 'Core (Requires restart)'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Source'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Format'. Language set to 'en-US'",
@@ -54,11 +35,12 @@
       "log: Translation not found for 'Direct Keyboard Input'. Language set to 'en-US'",
       "log: Translation not found for 'Forward Alt key'. Language set to 'en-US'",
       "log: Translation not found for 'Lock Mouse'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200024220000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x1b54006ee900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
-    ]
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000FC080000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [.WebGL-0x424006ca300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x424006ca300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x424006ca300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x424006ca300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ],
+    "error": "page.waitForFunction: Timeout 30000ms exceeded.\n    at testArcadePage (/home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:110:14)\n    at async file:///home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test.mjs:178:5"
   }
 }
