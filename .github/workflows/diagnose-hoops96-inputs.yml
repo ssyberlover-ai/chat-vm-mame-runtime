@@ -8,7 +8,7 @@ on:
       - "scripts/diagnose_hoops96_inputs.mjs"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnose:
@@ -32,6 +32,8 @@ jobs:
           done
 
       - name: Diagnose input paths
+        id: diagnose
+        continue-on-error: true
         env:
           SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user&touch=1
         run: node scripts/diagnose_hoops96_inputs.mjs
@@ -46,3 +48,41 @@ jobs:
             io-check-*.png
             /tmp/input-diagnostic-server.log
           if-no-files-found: ignore
+
+      - name: Record diagnostic result
+        if: always()
+        env:
+          OUTCOME: ${{ steps.diagnose.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          details = {}
+          path = Path("io-check-result.json")
+          if path.exists():
+              details = json.loads(path.read_text(encoding="utf-8"))
+          Path("hoops96-input-diagnostics-status.json").write_text(
+              json.dumps({
+                  "result": os.environ["OUTCOME"],
+                  "run_id": int(os.environ["RUN_ID"]),
+                  "run_url": os.environ["RUN_URL"],
+                  "details": details,
+              }, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          git add hoops96-input-diagnostics-status.json
+          git commit -m "chore: record Hoops 96 input diagnostics" || true
+          git push
+
+      - name: Fail when diagnostic failed
+        if: steps.diagnose.outcome != 'success'
+        run: exit 1
