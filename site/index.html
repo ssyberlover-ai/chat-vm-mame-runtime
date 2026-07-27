@@ -182,6 +182,7 @@ body.touch-ui #touch-controls{display:block}
     visible: false,
     profile: null,
     serviceEvents: 0,
+    resetEvents: 0,
     events: inputEvents
   };
 
@@ -253,13 +254,14 @@ body.touch-ui #touch-controls{display:block}
     return params.get("touch") === "1" || navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
   }
 
-  function inputButton({ id, label, hint = "", inputs = [], key = "", className = "" }) {
+  function inputButton({ id, label, hint = "", inputs = [], key = "", command = "", className = "" }) {
     const button = document.createElement("button");
     button.type = "button";
     button.id = id;
     button.className = `pad-key ${className}`.trim();
     button.dataset.inputs = inputs.join(",");
     if (key) button.dataset.key = key;
+    if (command) button.dataset.command = command;
     button.setAttribute("aria-label", hint ? `${label} ${hint}` : label);
     button.innerHTML = `<span>${escapeText(label)}${hint ? `<span class="control-hint">${escapeText(hint)}</span>` : ""}</span>`;
     return button;
@@ -296,6 +298,7 @@ body.touch-ui #touch-controls{display:block}
       );
       systemPad.append(
         inputButton({ id: "touch-test", label: "TEST", hint: "초기 설정", key: "F2", className: "test-key" }),
+        inputButton({ id: "touch-reset", label: "RESET", hint: "재부팅", command: "restart" }),
         inputButton({ id: "touch-coin", label: "COIN", inputs: [2] }),
         inputButton({ id: "touch-start", label: "START", inputs: [3] })
       );
@@ -393,6 +396,13 @@ body.touch-ui #touch-controls{display:block}
     if (!button || !touchControls.contains(button)) return;
     event.preventDefault();
     try { button.setPointerCapture(event.pointerId); } catch {}
+    if (button.dataset.command === "restart") {
+      button.classList.add("is-pressed");
+      pointerStates.set(event.pointerId, { button, indexes: [] });
+      window.EJS_emulator?.gameManager?.restart?.();
+      window.touchControlDiagnostics.resetEvents += 1;
+      return;
+    }
     if (button.dataset.key === "F2") {
       button.classList.add("is-pressed");
       pointerStates.set(event.pointerId, { button, indexes: [] });
