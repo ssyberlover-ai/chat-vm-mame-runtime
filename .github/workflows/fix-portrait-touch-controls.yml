@@ -1,0 +1,40 @@
+name: Fix portrait touch controls
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-portrait-touch-controls.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Remove conflicting fine-pointer override
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("site/index.html")
+          text = path.read_text(encoding="utf-8")
+          target = '@media(pointer:fine){#touch-controls{display:none!important}}\n'
+          if target not in text:
+              raise SystemExit("Expected fine-pointer override was not found")
+          path.write_text(text.replace(target, "", 1), encoding="utf-8")
+          PY
+
+      - name: Commit correction
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html
+          git commit -m "fix: keep touch controls visible on hybrid mobile pointers"
+          git push
