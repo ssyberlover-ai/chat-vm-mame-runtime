@@ -1,0 +1,253 @@
+name: Upgrade arcade controller
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/upgrade-arcade-controller.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Upgrade arcade controller and tests
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          site = Path("site/index.html")
+          text = site.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  '''.dpad{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);aspect-ratio:1;width:min(42vw,205px);gap:4px}
+.pad-key{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;padding:0;border:1px solid rgba(197,216,247,.42);background:rgba(18,31,51,.78);color:#fff;box-shadow:none;touch-action:none}
+.pad-key.is-pressed{background:rgba(73,137,224,.92);transform:scale(.96)}
+.dpad .pad-key{border-radius:14px;font-size:clamp(20px,6vw,31px)}
+.dpad-center{border:0;background:rgba(17,28,45,.45);pointer-events:none}
+''',
+                  '''.arcade-stick{--stick-x:0px;--stick-y:0px;position:relative;aspect-ratio:1;width:min(42vw,205px);border-radius:50%;border:2px solid rgba(180,203,235,.5);background:radial-gradient(circle at 48% 42%,rgba(71,89,116,.78) 0 36%,rgba(16,25,40,.94) 68%,rgba(3,7,13,.98) 100%);box-shadow:inset 0 7px 18px rgba(255,255,255,.12),inset 0 -14px 24px rgba(0,0,0,.72),0 10px 24px rgba(0,0,0,.48);touch-action:none;pointer-events:auto}
+.arcade-stick::before{content:"";position:absolute;inset:13%;clip-path:polygon(29% 0,71% 0,100% 29%,100% 71%,71% 100%,29% 100%,0 71%,0 29%);background:linear-gradient(145deg,rgba(109,130,163,.42),rgba(10,18,30,.72));box-shadow:inset 0 0 0 2px rgba(196,215,244,.2),inset 0 0 22px rgba(0,0,0,.65)}
+.arcade-stick::after{content:"8 WAY";position:absolute;left:50%;bottom:5%;transform:translateX(-50%);font:700 9px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.16em;color:rgba(208,220,239,.5);pointer-events:none}
+.stick-cross{position:absolute;inset:24%;border-radius:50%;background:linear-gradient(90deg,transparent 47%,rgba(216,228,246,.13) 48% 52%,transparent 53%),linear-gradient(transparent 47%,rgba(216,228,246,.13) 48% 52%,transparent 53%);pointer-events:none}
+.stick-knob{position:absolute;z-index:3;left:50%;top:50%;width:39%;aspect-ratio:1;border-radius:50%;transform:translate(calc(-50% + var(--stick-x)),calc(-50% + var(--stick-y)));background:radial-gradient(circle at 34% 27%,#ffd0c9 0 7%,#ee695c 13%,#c72f29 40%,#74100f 74%,#260404 100%);border:3px solid rgba(255,190,184,.34);box-shadow:inset 0 7px 9px rgba(255,255,255,.3),inset 0 -12px 16px rgba(50,0,0,.55),0 7px 0 #3d0808,0 13px 22px rgba(0,0,0,.64);will-change:transform;pointer-events:none}
+.arcade-stick.is-pressed .stick-knob{filter:saturate(1.14)}
+.pad-key{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;padding:0;border:1px solid rgba(197,216,247,.42);background:rgba(18,31,51,.78);color:#fff;box-shadow:none;touch-action:none}
+.pad-key.is-pressed{background:rgba(73,137,224,.92);transform:scale(.96)}
+'''
+              ),
+              (
+                  '''.action-pad{display:grid;align-items:center;justify-items:center;gap:8px;width:min(42vw,220px)}
+.action-pad.arcade{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}
+.action-pad.console{grid-template-columns:repeat(2,1fr);grid-template-rows:auto auto}
+.action-pad .pad-key{width:clamp(64px,17vw,86px);height:clamp(64px,17vw,86px);border-radius:50%;font-size:18px}
+.action-pad .action-1{grid-column:1;grid-row:2}
+.action-pad .action-2{grid-column:2;grid-row:1}
+.action-pad .action-3{grid-column:2;grid-row:2}
+''',
+                  '''.action-pad{display:grid;align-items:center;justify-items:center;gap:8px;width:min(42vw,220px)}
+.action-pad.arcade{position:relative;display:block;aspect-ratio:1.16;width:min(43vw,230px);filter:drop-shadow(0 12px 15px rgba(0,0,0,.34))}
+.action-pad.console{grid-template-columns:repeat(2,1fr);grid-template-rows:auto auto}
+.action-pad .pad-key{width:clamp(64px,17vw,86px);height:clamp(64px,17vw,86px);border-radius:50%;font-size:18px}
+.action-pad.arcade .pad-key{position:absolute;width:clamp(70px,18vw,92px);height:clamp(70px,18vw,92px);border:5px solid rgba(255,255,255,.22);font-size:20px;font-weight:950;letter-spacing:.04em;text-shadow:0 2px 2px rgba(0,0,0,.45);box-shadow:inset 0 8px 9px rgba(255,255,255,.34),inset 0 -11px 13px rgba(0,0,0,.34),0 7px 0 var(--button-rim),0 12px 18px rgba(0,0,0,.48);background:radial-gradient(circle at 35% 27%,var(--button-highlight) 0 8%,var(--button-face) 22%,var(--button-dark) 78%,var(--button-rim) 100%);transition:transform .04s linear,box-shadow .04s linear,filter .04s linear}
+.action-pad.arcade .pad-key.is-pressed{transform:translateY(5px) scale(.98);box-shadow:inset 0 5px 9px rgba(255,255,255,.2),inset 0 -7px 10px rgba(0,0,0,.38),0 2px 0 var(--button-rim),0 5px 10px rgba(0,0,0,.42);filter:saturate(1.2) brightness(.95)}
+.action-pad.arcade .action-1{--button-highlight:#ffc4bb;--button-face:#e94e42;--button-dark:#a61917;--button-rim:#4f0909;left:0;bottom:2%}
+.action-pad.arcade .action-2{--button-highlight:#fff0a6;--button-face:#f3ca35;--button-dark:#ad7604;--button-rim:#5c3700;left:38%;top:0}
+.action-pad.arcade .action-3{--button-highlight:#c4ddff;--button-face:#4b8ee9;--button-dark:#1853a4;--button-rim:#082a61;right:0;bottom:13%}
+'''
+              ),
+              ('body.touch-ui .dpad{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}', 'body.touch-ui .arcade-stick{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}'),
+              ('  .dpad{width:min(29vw,43vh,190px)}', '  .arcade-stick{width:min(29vw,43vh,190px)}'),
+              ('<div id="dpad" class="dpad" aria-label="8방향 패드"></div>', '<div id="dpad" class="arcade-stick" aria-label="8방향 아케이드 스틱"></div>'),
+              ('모바일 가로 화면에서는 패드가 게임 위에 반투명으로 표시되고, 세로 화면에서는 게임 아래에 분리됩니다. 방향과 액션 버튼은 동시에 길게 누를 수 있습니다.', '모바일 가로 화면에서는 원형 아케이드 스틱과 볼록한 3버튼이 게임 위에 표시되고, 세로 화면에서는 게임 아래에 분리됩니다. 레버와 버튼은 동시에 길게 누를 수 있습니다.'),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Missing site patch target: {old[:100]!r}")
+              text = text.replace(old, new, 1)
+
+          old_function = '''  function buildDpad() {
+    const directions = [
+      ["↖", [4, 6], "왼쪽 위"], ["↑", [4], "위"], ["↗", [4, 7], "오른쪽 위"],
+      ["←", [6], "왼쪽"], ["", [], ""], ["→", [7], "오른쪽"],
+      ["↙", [5, 6], "왼쪽 아래"], ["↓", [5], "아래"], ["↘", [5, 7], "오른쪽 아래"]
+    ];
+    dpad.replaceChildren(...directions.map(([label, inputs, hint], index) => {
+      if (!inputs.length) {
+        const center = document.createElement("span");
+        center.className = "dpad-center";
+        return center;
+      }
+      return inputButton({ id: `touch-dir-${index}`, label, hint, inputs, className: "direction-key" });
+    }));
+  }
+'''
+          new_function = '''  function centerArcadeStick() {
+    dpad.style.setProperty("--stick-x", "0px");
+    dpad.style.setProperty("--stick-y", "0px");
+    dpad.classList.remove("is-pressed");
+  }
+
+  function arcadeStickInputs(dx, dy, deadZone) {
+    if (Math.hypot(dx, dy) < deadZone) return [];
+    const sector = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+    return [
+      [7], [5, 7], [5], [5, 6], [6], [4, 6], [4], [4, 7]
+    ][sector];
+  }
+
+  function updateArcadeStick(event) {
+    const rect = dpad.getBoundingClientRect();
+    const dx = event.clientX - (rect.left + rect.width / 2);
+    const dy = event.clientY - (rect.top + rect.height / 2);
+    const distance = Math.hypot(dx, dy);
+    const maxTravel = rect.width * .255;
+    const scale = distance > maxTravel ? maxTravel / distance : 1;
+    const visualX = dx * scale;
+    const visualY = dy * scale;
+    dpad.style.setProperty("--stick-x", `${visualX}px`);
+    dpad.style.setProperty("--stick-y", `${visualY}px`);
+    dpad.classList.add("is-pressed");
+
+    const indexes = arcadeStickInputs(dx, dy, rect.width * .15);
+    const previous = pointerStates.get(event.pointerId);
+    if (previous && previous.button === dpad && previous.indexes.join(",") === indexes.join(",")) return;
+    holdInputs(event.pointerId, dpad, indexes);
+  }
+
+  function buildArcadeStick() {
+    dpad.className = "arcade-stick";
+    const cross = document.createElement("span");
+    cross.className = "stick-cross";
+    const knob = document.createElement("span");
+    knob.className = "stick-knob";
+    dpad.replaceChildren(cross, knob);
+    centerArcadeStick();
+
+    if (dpad.dataset.bound === "1") return;
+    dpad.dataset.bound = "1";
+    dpad.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      try { dpad.setPointerCapture(event.pointerId); } catch {}
+      updateArcadeStick(event);
+      try { navigator.vibrate?.(8); } catch {}
+    });
+    dpad.addEventListener("pointermove", event => {
+      const state = pointerStates.get(event.pointerId);
+      if (state?.button === dpad) updateArcadeStick(event);
+    });
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      dpad.addEventListener(type, event => {
+        releasePointer(event.pointerId);
+        centerArcadeStick();
+      });
+    }
+  }
+'''
+          if old_function not in text:
+              raise SystemExit("Missing buildDpad function")
+          text = text.replace(old_function, new_function, 1)
+          text = text.replace('    buildDpad();', '    buildArcadeStick();', 1)
+          text = text.replace('    touchControls.querySelectorAll(".is-pressed").forEach(button => button.classList.remove("is-pressed"));', '    touchControls.querySelectorAll(".is-pressed").forEach(button => button.classList.remove("is-pressed"));\n    centerArcadeStick();', 1)
+          text = text.replace('    button.classList.add("is-pressed");\n  }', '    button.classList.add("is-pressed");\n    if (button.closest(".action-pad.arcade")) { try { navigator.vibrate?.(12); } catch {} }\n  }', 1)
+          site.write_text(text, encoding="utf-8")
+
+          test = Path("scripts/smoke_test_user_rom.mjs")
+          test_text = test.read_text(encoding="utf-8")
+          test_text = test_text.replace(
+              '''  const expectedControls = [
+    ["#touch-b1", "B1"],''',
+              '''  const expectedControls = [
+    ["#dpad.arcade-stick", "STICK"],
+    ["#touch-b1", "B1"],''',
+              1,
+          )
+          old_input = '''  await page.dispatchEvent("#touch-dir-5", "pointerdown", pointerEvent(41));
+  await page.dispatchEvent("#touch-b1", "pointerdown", pointerEvent(42));
+  await sleep(350);
+'''
+          new_input = '''  const stickBox = await page.locator("#dpad").boundingBox();
+  if (!stickBox) throw new Error("Arcade stick bounding box was not found");
+  const stickRight = {
+    ...pointerEvent(41),
+    clientX: stickBox.x + stickBox.width * .82,
+    clientY: stickBox.y + stickBox.height * .5
+  };
+  await page.dispatchEvent("#dpad", "pointerdown", stickRight);
+  await page.dispatchEvent("#touch-b1", "pointerdown", pointerEvent(42));
+  await sleep(350);
+'''
+          if old_input not in test_text:
+              raise SystemExit("Missing old direction input test")
+          test_text = test_text.replace(old_input, new_input, 1)
+          test_text = test_text.replace(
+              '  await page.dispatchEvent("#touch-dir-5", "pointerup", { ...pointerEvent(41), buttons: 0 });',
+              '  await page.dispatchEvent("#dpad", "pointerup", { ...stickRight, buttons: 0 });',
+              1,
+          )
+          test_text = test_text.replace(
+              '''    const buttons = [...document.querySelectorAll("#touch-controls .pad-key")];
+    return {
+      separated: Boolean(canvasRect && controlsRect && controlsRect.top >= canvasRect.bottom - 2),
+      noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      controlsInsideViewport: buttons.every(button => {''',
+              '''    const buttons = [...document.querySelectorAll("#touch-controls .pad-key")];
+    const stick = document.querySelector("#dpad.arcade-stick");
+    const stickRect = stick?.getBoundingClientRect();
+    return {
+      separated: Boolean(canvasRect && controlsRect && controlsRect.top >= canvasRect.bottom - 2),
+      noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      controlsInsideViewport: Boolean(stickRect && stickRect.left >= -1 && stickRect.right <= window.innerWidth + 1) && buttons.every(button => {''',
+              1,
+          )
+          test.write_text(test_text, encoding="utf-8")
+
+          deploy = Path(".github/workflows/deploy-pages.yml")
+          deploy_text = deploy.read_text(encoding="utf-8")
+          deploy_text = deploy_text.replace(
+              '''          if ids != expected:
+              raise SystemExit(f'Unexpected ROM catalog: {sorted(ids)}')''',
+              '''          missing = expected - ids
+          if missing:
+              raise SystemExit(f'Missing required ROMs: {sorted(missing)}; published={sorted(ids)}')''',
+              1,
+          )
+          deploy.write_text(deploy_text, encoding="utf-8")
+          PY
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local site
+        run: |
+          python3 -m http.server 8000 --directory site > /tmp/arcade-controller-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8000/ >/dev/null && break
+            sleep 1
+          done
+
+      - name: Test upgraded controller
+        env:
+          SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user&touch=1
+        run: node scripts/smoke_test_user_rom.mjs
+
+      - name: Commit upgraded controller
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html scripts/smoke_test_user_rom.mjs .github/workflows/deploy-pages.yml
+          git commit -m "feat: replace mobile pad with arcade stick and buttons"
+          git push
