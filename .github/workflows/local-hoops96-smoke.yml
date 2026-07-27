@@ -43,21 +43,23 @@ jobs:
           curl --fail --silent http://127.0.0.1:8000/roms/manifest.json >/dev/null
           curl --fail --silent --range 0-1023 http://127.0.0.1:8000/roms/hoops96.zip >/dev/null
 
-      - name: Run Hoops 96 browser test
+      - name: Run adaptive Hoops 96 mobile browser test
         id: browser_test
         continue-on-error: true
         env:
-          SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user
+          SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user&touch=1
         run: node scripts/smoke_test_user_rom.mjs
 
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: local-hoops96-smoke-${{ github.run_id }}
+          name: adaptive-hoops96-smoke-${{ github.run_id }}
           path: |
             smoke-hoops96-result.json
+            smoke-hoops96-before-test.png
             smoke-hoops96.png
+            smoke-hoops96-full.png
             smoke-hoops96-failure.png
             /tmp/hoops96-server.log
           if-no-files-found: ignore
@@ -92,7 +94,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
           git add local-hoops96-status.json
-          git commit -m "chore: record local Hoops 96 smoke test" || true
+          git commit -m "chore: record adaptive Hoops 96 smoke test" || true
           git push
 
       - name: Fail when browser test failed
