@@ -70,7 +70,12 @@ body.touch-ui #touch-controls{display:block}
   body.touch-ui #game-shell{display:grid;grid-template-rows:minmax(300px,56dvh) auto;margin:6px 0 0;padding:0;border:0;border-radius:0;overflow:visible}
   body.touch-ui #game{height:56dvh;min-height:300px}
   body.touch-ui #touch-controls{position:relative;padding:12px max(10px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));background:#0b1320;border-top:1px solid #2f405b}
-  body.touch-ui .touch-layout{min-height:260px}
+  body.touch-ui .touch-layout{min-height:280px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto;gap:10px;align-items:center}
+  body.touch-ui .dpad{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}
+  body.touch-ui .action-pad{grid-column:2;grid-row:1;width:min(40vw,172px);justify-self:end}
+  body.touch-ui .action-pad .pad-key{width:clamp(58px,16vw,72px);height:clamp(58px,16vw,72px)}
+  body.touch-ui .system-pad{grid-column:1/-1;grid-row:2;flex-direction:row;justify-content:center;padding:2px 0 0}
+  body.touch-ui .system-pad .pad-key{width:72px;height:40px;min-height:40px}
   .notice{font-size:11px;margin:0;border-radius:0}
 }
 @media(max-width:420px){#catalog{grid-template-columns:1fr}}
