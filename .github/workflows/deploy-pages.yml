@@ -31,16 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp site/index.html _site/index.html
-          if [ -f site/manifest.webmanifest ]; then
-            cp site/manifest.webmanifest _site/manifest.webmanifest
-          fi
+          cp -R site/. _site/
           touch _site/.nojekyll
 
           test -s _site/index.html
-          grep -Fq 'EJS_core = "mame2003_plus"' _site/index.html
+          test -s _site/roms/manifest.json
+          test -s _site/roms/tobu-tobu-girl-deluxe.gb
+          test -s _site/roms/porklike-gb.gb
+          test -s _site/roms/5-mazes.gb
+          test -s _site/roms/cybercoaster.nes
           grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' _site/index.html
-          grep -Fq 'Robby Roto 시작' _site/index.html
+          grep -Fq './roms/manifest.json' _site/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -68,19 +69,32 @@ jobs:
     needs: deploy
     timeout-minutes: 5
     steps:
-      - name: Verify deployed page
+      - name: Verify deployed page and ROM catalog
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
         run: |
           set -euo pipefail
-          URL="${PAGE_URL%/}/?deploy=${GITHUB_SHA}"
+          BASE="${PAGE_URL%/}/"
           curl --fail --location --silent --show-error \
             --retry 12 --retry-delay 5 --retry-all-errors \
-            "$URL" --output /tmp/index.html
+            "${BASE}?deploy=${GITHUB_SHA}" --output /tmp/index.html
+          curl --fail --location --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors \
+            "${BASE}roms/manifest.json?deploy=${GITHUB_SHA}" --output /tmp/manifest.json
+
           test -s /tmp/index.html
-          grep -Fq 'EJS_core = "mame2003_plus"' /tmp/index.html
+          test -s /tmp/manifest.json
           grep -Fq 'cdn.emulatorjs.org/4.2.3/data/loader.js' /tmp/index.html
-          echo "Playable page published: $URL"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/manifest.json').read_text())
+          ids = {game['id'] for game in data['games']}
+          expected = {'tobu-tobu-girl-deluxe', 'porklike-gb', '5-mazes', 'cybercoaster'}
+          if ids != expected:
+              raise SystemExit(f'Unexpected ROM catalog: {sorted(ids)}')
+          print('Published ROM catalog:', ', '.join(sorted(ids)))
+          PY
 
   report:
     if: always()
