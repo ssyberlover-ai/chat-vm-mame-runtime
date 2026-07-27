@@ -1,0 +1,217 @@
+name: Sync open-license ROMs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-open-roms.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-open-roms
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download current open-license releases
+        run: |
+          set -euo pipefail
+          mkdir -p site/roms notices/open-roms
+
+          fetch() {
+            local url="$1"
+            local output="$2"
+            curl --fail --location --silent --show-error \
+              --retry 8 --retry-delay 3 --retry-all-errors \
+              -A "chat-vm-open-rom-sync/1.0" \
+              "$url" --output "$output"
+            test -s "$output"
+          }
+
+          fetch "https://hh3.gbdev.io/static/database-gb/entries/tobutobugirldeluxe/tobudx.gb" \
+            "site/roms/tobu-tobu-girl-deluxe.gb"
+          fetch "https://hh3.gbdev.io/static/database-gb/entries/porklike-gb/porklike.gb" \
+            "site/roms/porklike-gb.gb"
+          fetch "https://hh3.gbdev.io/static/database-gb/entries/5-mazes/5%20mazes.gb" \
+            "site/roms/5-mazes.gb"
+          fetch "https://hh3.gbdev.io/static/database-nes/entries/cybercoaster/cybercoaster.nes" \
+            "site/roms/cybercoaster.nes"
+
+      - name: Validate ROM formats and generate manifest
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path("site/roms")
+          nintendo_logo = bytes.fromhex(
+              "CEED6666CC0D000B03730083000C000D"
+              "0008111F8889000EDCCC6EE6DDDDD999"
+              "BBBB67636E0EECCCDDC999FBBB933E"
+          )
+
+          games = [
+              {
+                  "id": "tobu-tobu-girl-deluxe",
+                  "title": "Tobu Tobu Girl Deluxe",
+                  "platform": "Game Boy",
+                  "core": "gambatte",
+                  "file": "tobu-tobu-girl-deluxe.gb",
+                  "license": "MIT",
+                  "developer": "Tangram Games",
+                  "release_date": None,
+                  "source_page": "https://hh.gbdev.io/game/tobutobugirldeluxe/",
+                  "source_code": "https://github.com/SimonLarsen/tobutobugirl-dx",
+              },
+              {
+                  "id": "porklike-gb",
+                  "title": "Porklike GB",
+                  "platform": "Game Boy",
+                  "core": "gambatte",
+                  "file": "porklike-gb.gb",
+                  "license": "MIT",
+                  "developer": "Ben Smith (binji)",
+                  "release_date": "2021-10-01",
+                  "source_page": "https://hh.gbdev.io/game/porklike-gb/",
+                  "source_code": "https://github.com/binji/porklike.gb",
+              },
+              {
+                  "id": "5-mazes",
+                  "title": "5 Mazes",
+                  "platform": "Game Boy",
+                  "core": "gambatte",
+                  "file": "5-mazes.gb",
+                  "license": "MIT",
+                  "developer": "godai78",
+                  "release_date": "2023-02-27",
+                  "source_page": "https://hh.gbdev.io/game/5-mazes/",
+                  "source_code": "https://github.com/godai78/5-Mazes",
+              },
+              {
+                  "id": "cybercoaster",
+                  "title": "Cybercoaster",
+                  "platform": "NES",
+                  "core": "fceumm",
+                  "file": "cybercoaster.nes",
+                  "license": "CC-BY-4.0",
+                  "developer": "Fizzer & noby",
+                  "release_date": "2025-04-20",
+                  "source_page": "https://hh.gbdev.io/game/cybercoaster/",
+                  "source_code": None,
+              },
+          ]
+
+          for game in games:
+              path = root / game["file"]
+              data = path.read_bytes()
+              if len(data) < 16 * 1024:
+                  raise RuntimeError(f"ROM is unexpectedly small: {path} ({len(data)} bytes)")
+
+              if path.suffix == ".nes":
+                  if data[:4] != b"NES\x1a":
+                      raise RuntimeError(f"Invalid iNES header: {path}")
+              elif path.suffix == ".gb":
+                  if len(data) < 0x150:
+                      raise RuntimeError(f"Invalid Game Boy ROM size: {path}")
+                  if data[0x104:0x134] != nintendo_logo:
+                      raise RuntimeError(f"Invalid Game Boy logo/header: {path}")
+              else:
+                  raise RuntimeError(f"Unexpected ROM extension: {path}")
+
+              game["size_bytes"] = len(data)
+              game["sha256"] = hashlib.sha256(data).hexdigest()
+              game["url"] = f"./roms/{game['file']}"
+
+          manifest = {
+              "schema_version": 1,
+              "generated_at": datetime.now(timezone.utc).isoformat(),
+              "policy": "Only ROMs with explicit redistribution licenses are mirrored here.",
+              "games": games,
+          }
+          (root / "manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(manifest, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Write license and provenance notices
+        run: |
+          cat > notices/open-roms/LICENSES.md <<'EOF'
+          # Open ROM license and provenance notices
+
+          The ROM binaries under `site/roms/` are mirrored only where the published license explicitly permits redistribution.
+
+          ## Tobu Tobu Girl Deluxe
+
+          - Copyright (c) 2017 Tangram Games
+          - License: MIT
+          - Source: https://github.com/SimonLarsen/tobutobugirl-dx
+          - Distribution entry: https://hh.gbdev.io/game/tobutobugirldeluxe/
+
+          ## Porklike GB
+
+          - Copyright (c) 2021 Ben Smith
+          - License: MIT
+          - Source: https://github.com/binji/porklike.gb
+          - Distribution entry: https://hh.gbdev.io/game/porklike-gb/
+
+          ## 5 Mazes
+
+          - Copyright (c) 2023 godai78
+          - License: MIT
+          - Source: https://github.com/godai78/5-Mazes
+          - Distribution entry: https://hh.gbdev.io/game/5-mazes/
+
+          ## Cybercoaster
+
+          - Developer attribution: Fizzer & noby
+          - License: Creative Commons Attribution 4.0 International
+          - Distribution entry: https://hh.gbdev.io/game/cybercoaster/
+          - License text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+          ## MIT license text
+
+          Permission is hereby granted, free of charge, to any person obtaining a copy
+          of this software and associated documentation files (the "Software"), to deal
+          in the Software without restriction, including without limitation the rights
+          to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+          copies of the Software, and to permit persons to whom the Software is
+          furnished to do so, subject to the following conditions:
+
+          The above copyright notice and this permission notice shall be included in all
+          copies or substantial portions of the Software.
+
+          THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+          IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+          FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+          AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+          LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+          OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+          SOFTWARE.
+          EOF
+
+      - name: Commit verified ROMs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/roms notices/open-roms/LICENSES.md
+          if git diff --cached --quiet; then
+            echo "Open ROM catalog is already current."
+            exit 0
+          fi
+          git commit -m "feat: add verified open-license ROM catalog"
+          git push
