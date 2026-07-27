@@ -1,6 +1,6 @@
 name: Local Hoops 96 smoke test
 
-# Validates landscape play controls and separated portrait controls.
+# Final validation for landscape play and compact portrait controls.
 on:
   workflow_dispatch:
   push:
