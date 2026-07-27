@@ -59,7 +59,8 @@ jobs:
             smoke-hoops96-result.json
             smoke-hoops96-before-test.png
             smoke-hoops96.png
-            smoke-hoops96-full.png
+            smoke-hoops96-landscape.png
+            smoke-hoops96-portrait.png
             smoke-hoops96-failure.png
             /tmp/hoops96-server.log
           if-no-files-found: ignore
