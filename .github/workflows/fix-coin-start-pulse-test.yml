@@ -1,0 +1,85 @@
+name: Fix coin start pulse test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-coin-start-pulse-test.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Use frame-length COIN and START pulses
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/smoke_test_user_rom.mjs")
+          text = path.read_text(encoding="utf-8")
+
+          old_fields = "  coin_start_screen_changed: false,\n"
+          new_fields = "  coin_screen_changed: false,\n  start_screen_changed: false,\n"
+          if old_fields not in text:
+              raise SystemExit("Expected result field was not found")
+          text = text.replace(old_fields, new_fields, 1)
+
+          old_block = '''  await page.locator("#touch-coin").tap();
+  await page.waitForTimeout(700);
+  await page.locator("#touch-start").tap();
+  await page.waitForTimeout(7000);
+  const afterCoinStart = await canvas.screenshot({ path: "smoke-hoops96-after-coin-start.png" });
+  result.coin_start_screen_changed = sha256(afterReset) !== sha256(afterCoinStart);
+  if (!result.coin_start_screen_changed) {
+    throw new Error("Game canvas did not change after COIN and START inputs");
+  }
+'''
+          new_block = '''  const pulseControl = async (selector, pointerId, duration = 400) => {
+    const down = {
+      pointerId,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      button: 0,
+      clientX: 10,
+      clientY: 10
+    };
+    await page.dispatchEvent(selector, "pointerdown", down);
+    await page.waitForTimeout(duration);
+    await page.dispatchEvent(selector, "pointerup", { ...down, buttons: 0 });
+  };
+
+  await pulseControl("#touch-coin", 51);
+  await page.waitForTimeout(1200);
+  const afterCoin = await canvas.screenshot({ path: "smoke-hoops96-after-coin.png" });
+  result.coin_screen_changed = sha256(afterReset) !== sha256(afterCoin);
+
+  await pulseControl("#touch-start", 52);
+  await page.waitForTimeout(8000);
+  const afterStart = await canvas.screenshot({ path: "smoke-hoops96-after-start.png" });
+  result.start_screen_changed = sha256(afterCoin) !== sha256(afterStart);
+  if (!result.coin_screen_changed || !result.start_screen_changed) {
+    throw new Error("Game canvas did not change after held COIN and START inputs");
+  }
+'''
+          if old_block not in text:
+              raise SystemExit("Expected COIN/START test block was not found")
+          text = text.replace(old_block, new_block, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit test correction
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/smoke_test_user_rom.mjs
+          git commit -m "test: hold COIN and START across multiple frames"
+          git push
