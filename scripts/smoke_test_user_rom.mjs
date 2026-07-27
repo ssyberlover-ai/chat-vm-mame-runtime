@@ -28,7 +28,8 @@ const result = {
   released_inputs: false,
   service_switch_sent: false,
   screen_changed_after_service: false,
-  service_exit_screen_changed: false,
+  reset_sent: false,
+  screen_changed_after_reset: false,
   coin_start_screen_changed: false,
   portrait_controls_separated: false,
   portrait_no_horizontal_overflow: false,
@@ -95,9 +96,10 @@ try {
     ["#touch-b1", "B1"],
     ["#touch-b2", "B2"],
     ["#touch-b3", "B3"],
+    ["#touch-test", "TEST"],
+    ["#touch-reset", "RESET"],
     ["#touch-coin", "COIN"],
-    ["#touch-start", "START"],
-    ["#touch-test", "TEST"]
+    ["#touch-start", "START"]
   ];
   for (const [selector, label] of expectedControls) {
     const control = page.locator(selector);
@@ -151,12 +153,16 @@ try {
     throw new Error("Game canvas did not change after the TEST service switch");
   }
 
-  await page.locator("#touch-test").tap();
-  await page.waitForTimeout(7000);
-  const afterServiceExit = await canvas.screenshot({ path: "smoke-hoops96-after-service-exit.png" });
-  result.service_exit_screen_changed = sha256(serviceMenu) !== sha256(afterServiceExit);
-  if (!result.service_exit_screen_changed) {
-    throw new Error("Game canvas did not change after exiting the service menu");
+  await page.locator("#touch-reset").tap();
+  await page.waitForTimeout(10000);
+  const afterReset = await canvas.screenshot({ path: "smoke-hoops96-after-reset.png" });
+  result.reset_sent = await page.evaluate(() =>
+    Number(window.touchControlDiagnostics?.resetEvents || 0) > 0
+  );
+  result.screen_changed_after_reset = sha256(serviceMenu) !== sha256(afterReset);
+  if (!result.reset_sent) throw new Error("RESET control did not restart the emulator");
+  if (!result.screen_changed_after_reset) {
+    throw new Error("Game canvas did not change after RESET");
   }
 
   await page.locator("#touch-coin").tap();
@@ -164,7 +170,7 @@ try {
   await page.locator("#touch-start").tap();
   await page.waitForTimeout(7000);
   const afterCoinStart = await canvas.screenshot({ path: "smoke-hoops96-after-coin-start.png" });
-  result.coin_start_screen_changed = sha256(afterServiceExit) !== sha256(afterCoinStart);
+  result.coin_start_screen_changed = sha256(afterReset) !== sha256(afterCoinStart);
   if (!result.coin_start_screen_changed) {
     throw new Error("Game canvas did not change after COIN and START inputs");
   }
