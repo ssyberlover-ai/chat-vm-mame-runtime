@@ -1,8 +1,38 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-07-27T00:04:42.771025+00:00",
-  "policy": "Only ROMs with explicit redistribution licenses are mirrored here.",
+  "schema_version": 2,
+  "generated_at": "2026-07-27T00:53:45.403499+00:00",
+  "policy": "Officially distributed homebrew ROMs are included only when their license permits redistribution.",
   "games": [
+    {
+      "id": "minicraft-gba",
+      "title": "Minicraft GBA",
+      "platform": "Game Boy Advance",
+      "core": "mgba",
+      "file": "minicraft-gba.gba",
+      "license": "GPL-3.0-or-later",
+      "developer": "Vulcalien",
+      "release_date": "2026-02-19",
+      "source_page": "https://github.com/Vulcalien/minicraft-gba/releases/latest",
+      "source_code": "https://github.com/Vulcalien/minicraft-gba",
+      "size_bytes": 131072,
+      "sha256": "d0a62b6457b0d6fab383c417dca7ce9bcb9e239ced4c047e5fcbd1e010844caf",
+      "url": "./roms/minicraft-gba.gba"
+    },
+    {
+      "id": "2048-gb",
+      "title": "2048-gb",
+      "platform": "Game Boy",
+      "core": "gambatte",
+      "file": "2048-gb.gb",
+      "license": "Zlib",
+      "developer": "Sanqui",
+      "release_date": "2014",
+      "source_page": "https://github.com/Sanqui/2048-gb",
+      "source_code": "https://github.com/Sanqui/2048-gb",
+      "size_bytes": 32768,
+      "sha256": "3ea2376b15b34bd26b10e6b31d2753bf8b086098dbdb5ee84d9c0f03d66d3d7f",
+      "url": "./roms/2048-gb.gb"
+    },
     {
       "id": "tobu-tobu-girl-deluxe",
       "title": "Tobu Tobu Girl Deluxe",
