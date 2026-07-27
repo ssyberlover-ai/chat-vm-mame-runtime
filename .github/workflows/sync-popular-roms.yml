@@ -32,7 +32,7 @@ jobs:
             local output="$2"
             curl --fail --location --silent --show-error \
               --retry 8 --retry-delay 3 --retry-all-errors \
-              -A "chat-vm-popular-rom-sync/1.0" \
+              -A "chat-vm-popular-rom-sync/1.1" \
               "$url" --output "$output"
             test -s "$output"
           }
@@ -73,9 +73,6 @@ jobs:
             rm -f "$release_json"
           }
 
-          super_url="$(release_asset_url "sgadrat/super-tilt-bro" ".nes")"
-          fetch "$super_url" "site/roms/super-tilt-bro.nes"
-
           minicraft_url="$(release_asset_url "Vulcalien/minicraft-gba" ".zip" "sram-32kb")"
           fetch "$minicraft_url" "/tmp/popular-roms/minicraft-gba.zip"
           python3 - <<'PY'
@@ -85,7 +82,10 @@ jobs:
           archive = Path("/tmp/popular-roms/minicraft-gba.zip")
           output = Path("site/roms/minicraft-gba.gba")
           with ZipFile(archive) as bundle:
-              candidates = [info for info in bundle.infolist() if not info.is_dir() and info.filename.lower().endswith(".gba")]
+              candidates = [
+                  info for info in bundle.infolist()
+                  if not info.is_dir() and info.filename.lower().endswith(".gba")
+              ]
               if not candidates:
                   raise RuntimeError("Minicraft release archive does not contain a .gba ROM")
               candidates.sort(key=lambda info: info.file_size, reverse=True)
@@ -108,18 +108,6 @@ jobs:
           manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
           popular = [
-              {
-                  "id": "super-tilt-bro",
-                  "title": "Super Tilt Bro",
-                  "platform": "NES",
-                  "core": "fceumm",
-                  "file": "super-tilt-bro.nes",
-                  "license": "WTFPL-2.0",
-                  "developer": "Sylvain Gadrat",
-                  "release_date": "2026-01-31",
-                  "source_page": "https://sgadrat.itch.io/super-tilt-bro",
-                  "source_code": "https://github.com/sgadrat/super-tilt-bro",
-              },
               {
                   "id": "minicraft-gba",
                   "title": "Minicraft GBA",
@@ -152,8 +140,6 @@ jobs:
               suffix = path.suffix.lower()
               if len(data) < 16 * 1024:
                   raise RuntimeError(f"ROM is unexpectedly small: {path} ({len(data)} bytes)")
-              if suffix == ".nes" and data[:4] != b"NES\x1a":
-                  raise RuntimeError(f"Invalid iNES header: {path}")
               if suffix == ".gb" and len(data) < 0x150:
                   raise RuntimeError(f"Invalid Game Boy ROM: {path}")
               if suffix == ".gba" and (len(data) < 32 * 1024 or data[0xB2] != 0x96):
@@ -163,10 +149,16 @@ jobs:
               game["url"] = f"./roms/{game['file']}"
 
           popular_ids = {game["id"] for game in popular}
-          existing = [game for game in manifest.get("games", []) if game.get("id") not in popular_ids]
+          existing = [
+              game for game in manifest.get("games", [])
+              if game.get("id") not in popular_ids
+          ]
           manifest["schema_version"] = 2
           manifest["generated_at"] = datetime.now(timezone.utc).isoformat()
-          manifest["policy"] = "Officially distributed homebrew ROMs are included only when their license permits redistribution."
+          manifest["policy"] = (
+              "Officially distributed homebrew ROMs are included only when "
+              "their license permits redistribution."
+          )
           manifest["games"] = popular + existing
           manifest_path.write_text(
               json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
@@ -180,12 +172,6 @@ jobs:
           cat > notices/open-roms/POPULAR-ROM-NOTICES.md <<'EOF'
           # Popular officially distributed ROM notices
 
-          ## Super Tilt Bro
-          - Developer: Sylvain Gadrat
-          - Official free ROM: https://sgadrat.itch.io/super-tilt-bro
-          - Source: https://github.com/sgadrat/super-tilt-bro
-          - License: WTFPL version 2
-
           ## Minicraft GBA
           - Developer: Vulcalien
           - Official release: https://github.com/Vulcalien/minicraft-gba/releases/latest
@@ -197,6 +183,13 @@ jobs:
           - Official binary: https://sanqui.net/etc/2048.gb
           - Source: https://github.com/Sanqui/2048-gb
           - License: zlib
+
+          ## Super Tilt Bro
+          - Developer: Sylvain Gadrat
+          - Official free ROM: https://sgadrat.itch.io/super-tilt-bro
+          - Source: https://github.com/sgadrat/super-tilt-bro
+          - License: WTFPL version 2
+          - Note: itch.io uses a session-based download, so the current ROM must be uploaded manually before catalog registration.
           EOF
 
       - name: Commit verified popular ROMs
