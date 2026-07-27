@@ -1,6 +1,6 @@
 {
   "result": "success",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30234433028",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30235060657",
   "details": {
     "target_url": "http://127.0.0.1:8000/?game=hoops96-user&touch=1",
     "selected_game": "hoops96-user",
@@ -44,9 +44,9 @@
       "log: Translation not found for '-1'. Language set to 'en-US'",
       "log: Translation not found for '+1'. Language set to 'en-US'",
       "warning: Virtual gamepad settings is empty! Using default gamepad settings",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000643C0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200034010000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
       "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
-      "warning: enlarged memory arrays from 16777216 to 33554432, took 3 ms (has ArrayBuffer.transfer? false)",
+      "warning: enlarged memory arrays from 16777216 to 33554432, took 4 ms (has ArrayBuffer.transfer? false)",
       "log: Translation not found for 'Core (Requires restart)'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Source'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Format'. Language set to 'en-US'",
@@ -62,11 +62,11 @@
       "log: Translation not found for 'Direct Keyboard Input'. Language set to 'en-US'",
       "log: Translation not found for 'Forward Alt key'. Language set to 'en-US'",
       "log: Translation not found for 'Lock Mouse'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000643C0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: [.WebGL-0xdbc07ec4e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0xdbc07ec4e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0xdbc07ec4e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0xdbc07ec4e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A070200034010000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [.WebGL-0x26c4006dc000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x26c4006dc000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x26c4006dc000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x26c4006dc000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
     ],
     "page_errors": [
       "NotAllowedError: Wake Lock permission request denied"
