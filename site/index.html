@@ -4,65 +4,75 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#070b12">
-<title>Robby Roto · Web MAME</title>
+<title>Open ROM · Web Emulator</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#070b12;color:#f4f7ff}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:#070b12}
 body{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));overscroll-behavior:none}
-main{width:min(100%,1000px);margin:auto}
+main{width:min(100%,1040px);margin:auto}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
-h1{margin:0;font-size:21px;line-height:1.15}header p{margin:5px 0 0;color:#9eabc1;font-size:13px}
+h1{margin:0;font-size:22px;line-height:1.15}header p{margin:5px 0 0;color:#9eabc1;font-size:13px}
 #status{max-width:42%;font:12px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;color:#78efaa;text-align:right}
-#preflight{padding:18px;border:1px solid #33445e;border-radius:14px;background:#101827}
-#preflight p{margin:0 0 13px;font-size:13px;line-height:1.55;color:#c8d1e2}
-.agree{display:flex;align-items:flex-start;gap:9px;margin:14px 0;font-size:13px;line-height:1.45;color:#e5ebf7}.agree input{width:20px;height:20px;margin:0;flex:none}
+#preflight{padding:16px;border:1px solid #33445e;border-radius:14px;background:#101827}
+.intro{margin:0 0 14px;font-size:13px;line-height:1.55;color:#c8d1e2}
+#catalog{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.game-card{display:block;position:relative;padding:13px;border:1px solid #405474;border-radius:12px;background:#0b1422;cursor:pointer;min-height:132px}
+.game-card:has(input:checked){border-color:#70aaff;background:#142743;box-shadow:0 0 0 2px rgba(84,145,235,.22)}
+.game-card input{position:absolute;top:12px;right:12px;width:19px;height:19px}
+.game-title{display:block;padding-right:30px;font-size:16px;font-weight:850}
+.game-meta{display:block;margin-top:5px;color:#a9b7cb;font-size:12px;line-height:1.45}
+.game-license{display:inline-block;margin-top:9px;padding:3px 7px;border-radius:999px;background:#21334d;color:#bcd8ff;font-size:11px;font-weight:750}
+.game-source{display:block;margin-top:8px;color:#92bfff;font-size:11px;text-decoration:none;width:max-content;max-width:100%}
+.game-source:hover{text-decoration:underline}
+.agree{display:flex;align-items:flex-start;gap:9px;margin:15px 0 11px;font-size:13px;line-height:1.45;color:#e5ebf7}.agree input{width:20px;height:20px;margin:0;flex:none}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 button{min-height:50px;padding:11px 18px;border:1px solid #4c8ee8;border-radius:11px;background:#245da8;color:#fff;font-size:16px;font-weight:800;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 button:disabled{opacity:.45}
-a{color:#9ec5ff}
+#selection{color:#a9b7cb;font-size:12px}
 #game-shell{margin-top:12px;padding:7px;border:1px solid #34445e;border-radius:14px;background:#000;overflow:hidden}
 #game{width:100%;height:min(82dvh,800px);min-height:520px;background:#000;overflow:hidden;touch-action:none}
 #game canvas{image-rendering:pixelated}
 .notice{margin-top:12px;padding:11px;border:1px solid #354760;border-radius:10px;background:#0e1726;font-size:12px;line-height:1.5;color:#bec9dc}
 #error{white-space:pre-wrap;color:#ff9b9b;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
 body.running #preflight{display:none}
-@media (max-width:600px) and (orientation:portrait){#game{height:78dvh;min-height:560px}.notice{font-size:11px}}
-@media (orientation:landscape) and (max-height:700px){body{padding:4px}main{width:100%}header{position:absolute;z-index:3;left:12px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}header p{display:none}h1{font-size:15px}#status{font-size:10px}#game-shell{margin:0;padding:0;border:0;border-radius:0}#game{height:calc(100dvh - 8px);min-height:0}.notice{display:none}}
+@media(max-width:600px) and (orientation:portrait){#game{height:78dvh;min-height:560px}.notice{font-size:11px}#catalog{grid-template-columns:1fr 1fr}.game-card{min-height:145px;padding:11px}.game-title{font-size:14px}}
+@media(max-width:420px){#catalog{grid-template-columns:1fr}}
+@media(orientation:landscape) and (max-height:700px){body{padding:4px}main{width:100%}header{position:absolute;z-index:3;left:12px;right:12px;pointer-events:none;text-shadow:0 1px 3px #000}header p{display:none}h1{font-size:15px}#status{font-size:10px}#game-shell{margin:0;padding:0;border:0;border-radius:0}#game{height:calc(100dvh - 8px);min-height:0}.notice{display:none}}
 </style>
 </head>
 <body>
 <main>
   <header>
     <div>
-      <h1>Robby Roto · Web MAME</h1>
-      <p>멀티터치 D-pad · FIRE · COIN · START</p>
+      <h1>Open ROM · Web Emulator</h1>
+      <p>검증된 오픈 라이선스 ROM · 브라우저 직접 실행</p>
     </div>
-    <div id="status" role="status">시작 대기</div>
+    <div id="status" role="status">카탈로그 불러오는 중…</div>
   </header>
 
   <section id="preflight">
-    <p>
-      MAME 2003 Plus WebAssembly 코어로 게임을 직접 실행합니다.
-      Robby Roto ROM은 권리자의 허가에 따라 MAMEdev가 공개한 비상업적 사용용 파일입니다.
-      모바일에서는 가로 화면과 전체화면을 권장합니다.
+    <p class="intro">
+      저장소에는 재배포가 명시적으로 허용된 홈브루 ROM만 포함합니다.
+      Robby Roto는 저장소에 복제하지 않고 MAMEdev 공식 배포 파일을 원격으로 불러옵니다.
     </p>
+    <div id="catalog" role="radiogroup" aria-label="실행할 게임 선택"></div>
     <label class="agree">
       <input id="agree" type="checkbox">
-      <span>Robby Roto ROM의 비상업적 사용 조건과 저작권 고지를 확인했습니다.</span>
+      <span id="agree-text">선택한 게임의 라이선스와 저작권 고지를 확인했습니다.</span>
     </label>
     <div class="actions">
-      <button id="launch" type="button" disabled>Robby Roto 시작</button>
-      <a href="https://www.mamedev.org/roms/robby/" target="_blank" rel="noopener">ROM 사용 조건</a>
+      <button id="launch" type="button" disabled>선택한 게임 시작</button>
+      <span id="selection"></span>
     </div>
   </section>
 
-  <section id="game-shell" hidden aria-label="Robby Roto 에뮬레이터">
+  <section id="game-shell" hidden aria-label="게임 에뮬레이터">
     <div id="game"></div>
   </section>
 
   <aside class="notice">
-    왼쪽 D-pad는 누르고 있는 동안 계속 이동하며, 오른쪽 FIRE와 동시에 누를 수 있습니다. COIN 후 START를 누르세요.
+    모바일에서는 가로 화면과 전체화면을 권장합니다. 방향 패드는 누르고 있는 동안 계속 입력되며 A/B 또는 FIRE 버튼과 동시에 사용할 수 있습니다.
   </aside>
   <pre id="error" aria-live="polite"></pre>
 </main>
@@ -70,28 +80,95 @@ body.running #preflight{display:none}
 <script>
 "use strict";
 (() => {
+  const ROBBY = {
+    id: "robby",
+    title: "Robby Roto",
+    platform: "Arcade",
+    core: "mame2003_plus",
+    url: "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip",
+    license: "MAMEdev 비상업 사용",
+    developer: "Bally/Midway",
+    release_date: "1981",
+    source_page: "https://www.mamedev.org/roms/robby/",
+    hosted: false,
+    control_profile: "arcade"
+  };
+
+  const catalogNode = document.querySelector("#catalog");
   const agree = document.querySelector("#agree");
+  const agreeText = document.querySelector("#agree-text");
   const launch = document.querySelector("#launch");
   const shell = document.querySelector("#game-shell");
   const status = document.querySelector("#status");
+  const selection = document.querySelector("#selection");
   const error = document.querySelector("#error");
-  let loading = false;
 
-  agree.addEventListener("change", () => {
-    launch.disabled = !agree.checked || loading;
-  });
+  let games = [ROBBY];
+  let selected = null;
+  let loading = false;
 
   function fail(reason) {
     console.error(reason);
     status.textContent = "실행 실패";
     error.textContent = reason?.stack || String(reason);
-    launch.disabled = !agree.checked;
+    launch.disabled = !agree.checked || !selected;
     loading = false;
   }
 
+  function escapeText(value) {
+    return String(value ?? "").replace(/[&<>\"']/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+    })[character]);
+  }
+
+  function renderCatalog() {
+    catalogNode.innerHTML = games.map(game => {
+      const source = game.source_page
+        ? `<a class="game-source" href="${escapeText(game.source_page)}" target="_blank" rel="noopener">출처·라이선스 확인</a>`
+        : "";
+      const hosted = game.hosted === false ? "공식 원격 파일" : "저장소 포함";
+      return `<label class="game-card">
+        <input type="radio" name="game" value="${escapeText(game.id)}">
+        <span class="game-title">${escapeText(game.title)}</span>
+        <span class="game-meta">${escapeText(game.platform)} · ${escapeText(game.developer)}<br>${hosted}${game.release_date ? ` · ${escapeText(game.release_date)}` : ""}</span>
+        <span class="game-license">${escapeText(game.license)}</span>
+        ${source}
+      </label>`;
+    }).join("");
+
+    catalogNode.querySelectorAll('input[name="game"]').forEach(input => {
+      input.addEventListener("change", () => selectGame(input.value));
+    });
+
+    const requested = new URLSearchParams(location.search).get("game");
+    const preferred = games.find(game => game.id === requested)
+      || games.find(game => game.id === "cybercoaster")
+      || games[0];
+    const input = catalogNode.querySelector(`input[value="${CSS.escape(preferred.id)}"]`);
+    if (input) {
+      input.checked = true;
+      selectGame(preferred.id);
+    }
+  }
+
+  function selectGame(id) {
+    selected = games.find(game => game.id === id) || null;
+    agree.checked = false;
+    launch.disabled = true;
+    error.textContent = "";
+    if (!selected) return;
+    agreeText.textContent = `${selected.title}의 ${selected.license} 조건과 저작권 고지를 확인했습니다.`;
+    selection.textContent = `${selected.title} · ${selected.platform}`;
+    status.textContent = "게임 선택 완료";
+  }
+
+  agree.addEventListener("change", () => {
+    launch.disabled = !agree.checked || loading || !selected;
+  });
+
   function forceVirtualGamepad() {
     const emulator = window.EJS_emulator;
-    if (!emulator) return false;
+    if (!emulator || !matchMedia("(pointer: coarse)").matches) return false;
     emulator.touch = true;
     try { emulator.changeSettingOption?.("virtual-gamepad", "enabled", true); }
     catch (reason) { console.warn("virtual-gamepad setting", reason); }
@@ -100,45 +177,52 @@ body.running #preflight{display:none}
     return true;
   }
 
-  window.addEventListener("error", event => {
-    const message = String(event.error?.message || event.message || "");
-    if (/Wake Lock permission request denied/i.test(message)) return;
-    if (loading) fail(event.error || event.message);
-  });
+  function gamepadSettings(game) {
+    const commonDpad = { type: "dpad", location: "left", left: "50%", right: "50%", joystickInput: false, inputValues: [4, 5, 6, 7] };
+    if (game.control_profile === "arcade") {
+      return [
+        commonDpad,
+        { type: "button", text: "FIRE", id: "fire-b", location: "right", left: 24, top: 26, bold: true, fontSize: 18, input_value: 0 },
+        { type: "button", text: "FIRE 2", id: "fire-a", location: "right", left: 102, top: 84, bold: true, fontSize: 15, input_value: 8 },
+        { type: "button", text: "COIN", id: "coin", location: "center", left: -92, fontSize: 14, block: true, input_value: 2 },
+        { type: "button", text: "START", id: "start-game", location: "center", left: 5, fontSize: 14, block: true, input_value: 3 }
+      ];
+    }
+    return [
+      commonDpad,
+      { type: "button", text: "B", id: "button-b", location: "right", left: 24, top: 40, bold: true, fontSize: 20, input_value: 0 },
+      { type: "button", text: "A", id: "button-a", location: "right", left: 105, top: 92, bold: true, fontSize: 20, input_value: 8 },
+      { type: "button", text: "SELECT", id: "select-game", location: "center", left: -98, fontSize: 12, block: true, input_value: 2 },
+      { type: "button", text: "START", id: "start-game", location: "center", left: 8, fontSize: 13, block: true, input_value: 3 }
+    ];
+  }
 
-  launch.addEventListener("click", () => {
-    if (loading || !agree.checked) return;
+  function startSelectedGame() {
+    if (loading || !agree.checked || !selected) return;
     loading = true;
     launch.disabled = true;
-    status.textContent = "MAME 2003 Plus 로딩 중…";
+    status.textContent = `${selected.title} 코어 로딩 중…`;
     error.textContent = "";
     shell.hidden = false;
     document.body.classList.add("running");
 
     window.EJS_player = "#game";
-    window.EJS_core = "mame2003_plus";
-    window.EJS_gameName = "robby";
-    window.EJS_gameUrl = "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip";
+    window.EJS_core = selected.core;
+    window.EJS_gameName = selected.id === "robby" ? "robby" : selected.title;
+    window.EJS_gameUrl = selected.url;
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
     window.EJS_startOnLoaded = true;
     window.EJS_fullscreenOnLoaded = false;
-    window.EJS_controlScheme = "mame";
-    window.EJS_gameID = "robby";
+    window.EJS_controlScheme = selected.control_profile === "arcade" ? "mame" : undefined;
+    window.EJS_gameID = selected.id;
     window.EJS_backgroundColor = "#000";
     window.EJS_disableAutoLang = true;
     window.EJS_language = "en-US";
     window.EJS_askBeforeExit = false;
     window.EJS_noAutoFocus = false;
-    window.EJS_browserMode = "mobile";
     window.EJS_AdUrl = "";
-
-    window.EJS_VirtualGamepadSettings = [
-      { type: "dpad", location: "left", left: "50%", right: "50%", joystickInput: false, inputValues: [4, 5, 6, 7] },
-      { type: "button", text: "FIRE", id: "fire-b", location: "right", left: 24, top: 26, bold: true, fontSize: 18, input_value: 0 },
-      { type: "button", text: "FIRE 2", id: "fire-a", location: "right", left: 102, top: 84, bold: true, fontSize: 15, input_value: 8 },
-      { type: "button", text: "COIN", id: "coin", location: "center", left: -92, fontSize: 14, block: true, input_value: 2 },
-      { type: "button", text: "START", id: "start-game", location: "center", left: 5, fontSize: 14, block: true, input_value: 3 }
-    ];
+    if (matchMedia("(pointer: coarse)").matches) window.EJS_browserMode = "mobile";
+    window.EJS_VirtualGamepadSettings = gamepadSettings(selected);
 
     window.EJS_Buttons = {
       playPause: true, restart: true, mute: true, settings: true, fullscreen: true,
@@ -152,18 +236,18 @@ body.running #preflight{display:none}
       forceVirtualGamepad();
       status.textContent = "코어 준비 완료";
     };
-
     window.EJS_onGameStart = () => {
       loading = false;
       forceVirtualGamepad();
       setTimeout(forceVirtualGamepad, 250);
       setTimeout(forceVirtualGamepad, 1000);
-      status.textContent = "게임 실행 중";
-      window.webMameDiagnostics = {
+      status.textContent = `${selected.title} 실행 중`;
+      window.webEmulatorDiagnostics = {
         ready: true,
-        core: window.EJS_core,
-        hasEmulator: Boolean(window.EJS_emulator),
-        virtualGamepadForced: true
+        id: selected.id,
+        core: selected.core,
+        hosted: selected.hosted !== false,
+        hasEmulator: Boolean(window.EJS_emulator)
       };
     };
 
@@ -172,7 +256,31 @@ body.running #preflight{display:none}
     loader.async = true;
     loader.onerror = () => fail(new Error("EmulatorJS 로더를 가져오지 못했습니다."));
     document.body.appendChild(loader);
+  }
+
+  window.addEventListener("error", event => {
+    const message = String(event.error?.message || event.message || "");
+    if (/Wake Lock permission request denied/i.test(message)) return;
+    if (loading) fail(event.error || event.message);
   });
+
+  launch.addEventListener("click", startSelectedGame);
+
+  (async () => {
+    try {
+      const response = await fetch("./roms/manifest.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`ROM 카탈로그 HTTP ${response.status}`);
+      const manifest = await response.json();
+      const hostedGames = manifest.games.map(game => ({ ...game, hosted: true, control_profile: "console" }));
+      games = [...hostedGames, ROBBY];
+      status.textContent = `${hostedGames.length}개 오픈 ROM 준비 완료`;
+    } catch (reason) {
+      console.warn(reason);
+      status.textContent = "오픈 ROM 목록 실패 · Robby Roto만 사용 가능";
+      games = [ROBBY];
+    }
+    renderCatalog();
+  })();
 })();
 </script>
 </body>
