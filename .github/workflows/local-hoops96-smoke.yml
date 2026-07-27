@@ -1,0 +1,100 @@
+name: Local Hoops 96 smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/local-hoops96-smoke.yml"
+      - "scripts/smoke_test_user_rom.mjs"
+      - "site/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: local-hoops96-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local site
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8000 --directory site > /tmp/hoops96-server.log 2>&1 &
+          echo $! > /tmp/hoops96-server.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8000/roms/manifest.json >/dev/null
+          curl --fail --silent --range 0-1023 http://127.0.0.1:8000/roms/hoops96.zip >/dev/null
+
+      - name: Run Hoops 96 browser test
+        id: browser_test
+        continue-on-error: true
+        env:
+          SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user
+        run: node scripts/smoke_test_user_rom.mjs
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-hoops96-smoke-${{ github.run_id }}
+          path: |
+            smoke-hoops96-result.json
+            smoke-hoops96.png
+            smoke-hoops96-failure.png
+            /tmp/hoops96-server.log
+          if-no-files-found: ignore
+
+      - name: Record result
+        if: always()
+        env:
+          TEST_OUTCOME: ${{ steps.browser_test.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          details = {}
+          path = Path("smoke-hoops96-result.json")
+          if path.exists():
+              details = json.loads(path.read_text(encoding="utf-8"))
+          output = {
+              "result": os.environ["TEST_OUTCOME"],
+              "run_url": os.environ["RUN_URL"],
+              "details": details,
+          }
+          Path("local-hoops96-status.json").write_text(
+              json.dumps(output, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add local-hoops96-status.json
+          git commit -m "chore: record local Hoops 96 smoke test" || true
+          git push
+
+      - name: Fail when browser test failed
+        if: steps.browser_test.outcome != 'success'
+        run: exit 1
