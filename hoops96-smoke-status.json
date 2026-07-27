@@ -1,8 +1,8 @@
 {
   "result": "failure",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30231250686",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30232131870",
   "details": {
-    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user&test=30231250686",
+    "target_url": "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user&test=30232131870",
     "selected_game": null,
     "selected_core": null,
     "canvas": false,
