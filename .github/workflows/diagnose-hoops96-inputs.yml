@@ -1,0 +1,48 @@
+name: Diagnose Hoops 96 inputs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-hoops96-inputs.yml"
+      - "scripts/diagnose_hoops96_inputs.mjs"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start local site
+        run: |
+          python3 -m http.server 8000 --directory site > /tmp/input-diagnostic-server.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8000/ >/dev/null && break
+            sleep 1
+          done
+
+      - name: Diagnose input paths
+        env:
+          SMOKE_URL: http://127.0.0.1:8000/?game=hoops96-user&touch=1
+        run: node scripts/diagnose_hoops96_inputs.mjs
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoops96-input-diagnostics-${{ github.run_id }}
+          path: |
+            io-check-result.json
+            io-check-*.png
+            /tmp/input-diagnostic-server.log
+          if-no-files-found: ignore
