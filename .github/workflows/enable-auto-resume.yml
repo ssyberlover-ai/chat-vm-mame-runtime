@@ -1,0 +1,197 @@
+name: Enable browser autosave and resume
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/enable-auto-resume.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Add browser autosave and resume
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("site/index.html")
+          text = path.read_text(encoding="utf-8")
+
+          old_state = '''  let games = [ROBBY];
+          let selected = null;
+          let loading = false;
+
+          function fail(reason) {'''
+          new_state = '''  let games = [ROBBY];
+          let selected = null;
+          let loading = false;
+          let autoSaveTimer = null;
+          let autoSaveBusy = false;
+
+          function autoStateKey(game) {
+            return `chat-vm:auto:${game.id}.state`;
+          }
+
+          async function persistAutoState(reason = "interval") {
+            const emulator = window.EJS_emulator;
+            if (!selected || !emulator?.gameManager || !emulator?.storage?.states || autoSaveBusy) return false;
+            try {
+              autoSaveBusy = true;
+              const state = emulator.gameManager.getState();
+              if (!state || !state.byteLength) return false;
+              await emulator.storage.states.put(autoStateKey(selected), state);
+              try {
+                localStorage.setItem("chat-vm:last-game", selected.id);
+                localStorage.setItem(`chat-vm:last-save:${selected.id}`, new Date().toISOString());
+              } catch (_) {}
+              console.log(`[autosave] ${selected.id} · ${reason} · ${state.byteLength} bytes`);
+              return true;
+            } catch (reasonValue) {
+              console.warn("[autosave] failed", reasonValue);
+              return false;
+            } finally {
+              autoSaveBusy = false;
+            }
+          }
+
+          async function restoreAutoState() {
+            const emulator = window.EJS_emulator;
+            if (!selected || !emulator?.gameManager || !emulator?.storage?.states) return false;
+            try {
+              const state = await emulator.storage.states.get(autoStateKey(selected));
+              if (!state || !state.byteLength) return false;
+              emulator.gameManager.loadState(state);
+              console.log(`[autosave] restored ${selected.id} · ${state.byteLength} bytes`);
+              return true;
+            } catch (reasonValue) {
+              console.warn("[autosave] restore failed", reasonValue);
+              return false;
+            }
+          }
+
+          function beginAutoSave() {
+            if (autoSaveTimer) clearInterval(autoSaveTimer);
+            autoSaveTimer = setInterval(() => persistAutoState("interval"), 30000);
+          }
+
+          function fail(reason) {'''
+          if old_state in text:
+              text = text.replace(old_state, new_state)
+          elif "function autoStateKey(game)" not in text:
+              raise RuntimeError("State insertion point not found")
+
+          old_preferred = '''    const requested = new URLSearchParams(location.search).get("game");
+              const preferred = games.find(game => game.id === requested)
+                || games.find(game => game.id === "cybercoaster")
+                || games[0];'''
+          new_preferred = '''    const requested = new URLSearchParams(location.search).get("game");
+              let remembered = null;
+              try { remembered = localStorage.getItem("chat-vm:last-game"); } catch (_) {}
+              const preferred = games.find(game => game.id === requested)
+                || games.find(game => game.id === remembered)
+                || games.find(game => game.id === "cybercoaster")
+                || games[0];'''
+          if old_preferred in text:
+              text = text.replace(old_preferred, new_preferred)
+          elif "localStorage.getItem(\"chat-vm:last-game\")" not in text:
+              raise RuntimeError("Preferred-game insertion point not found")
+
+          old_buttons = '''      playPause: true, restart: true, mute: true, settings: true, fullscreen: true,
+                saveState: false, loadState: false, screenRecord: false, gamepad: true,
+                cheat: false, volume: true, saveSavFiles: false, loadSavFiles: false,
+                quickSave: false, quickLoad: false, screenshot: true, cacheManager: false,
+                exitEmulation: false'''
+          new_buttons = '''      playPause: true, restart: true, mute: true, settings: true, fullscreen: true,
+                saveState: true, loadState: true, screenRecord: false, gamepad: true,
+                cheat: false, volume: true, saveSavFiles: false, loadSavFiles: false,
+                quickSave: true, quickLoad: true, screenshot: true, cacheManager: false,
+                exitEmulation: false'''
+          if old_buttons in text:
+              text = text.replace(old_buttons, new_buttons)
+          elif "saveState: true, loadState: true" not in text:
+              raise RuntimeError("Button options insertion point not found")
+
+          old_ready = '''    window.EJS_ready = () => {
+                forceVirtualGamepad();
+                status.textContent = "코어 준비 완료";
+              };'''
+          new_ready = '''    window.EJS_ready = () => {
+                forceVirtualGamepad();
+                try {
+                  window.EJS_emulator?.changeSettingOption?.("save-state-location", "browser", true);
+                } catch (reasonValue) {
+                  console.warn("browser state setting", reasonValue);
+                }
+                status.textContent = "코어 준비 완료";
+              };'''
+          if old_ready in text:
+              text = text.replace(old_ready, new_ready)
+          elif "browser state setting" not in text:
+              raise RuntimeError("Ready callback insertion point not found")
+
+          old_start_tail = '''      window.webEmulatorDiagnostics = {
+                  ready: true,
+                  id: selected.id,
+                  core: selected.core,
+                  hosted: selected.hosted !== false,
+                  hasEmulator: Boolean(window.EJS_emulator)
+                };
+              };'''
+          new_start_tail = '''      window.webEmulatorDiagnostics = {
+                  ready: true,
+                  id: selected.id,
+                  core: selected.core,
+                  hosted: selected.hosted !== false,
+                  hasEmulator: Boolean(window.EJS_emulator)
+                };
+                setTimeout(async () => {
+                  const restored = await restoreAutoState();
+                  status.textContent = restored
+                    ? `${selected.title} 이어서 실행 중`
+                    : `${selected.title} 실행 중`;
+                  beginAutoSave();
+                }, 1200);
+              };'''
+          if old_start_tail in text:
+              text = text.replace(old_start_tail, new_start_tail)
+          elif "const restored = await restoreAutoState();" not in text:
+              raise RuntimeError("Game-start callback insertion point not found")
+
+          old_launch = '''  launch.addEventListener("click", startSelectedGame);
+
+            (async () => {'''
+          new_launch = '''  launch.addEventListener("click", startSelectedGame);
+
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "hidden") persistAutoState("visibility-hidden");
+            });
+            window.addEventListener("pagehide", () => {
+              persistAutoState("pagehide");
+            });
+
+            (async () => {'''
+          if old_launch in text:
+              text = text.replace(old_launch, new_launch)
+          elif "visibility-hidden" not in text:
+              raise RuntimeError("Page lifecycle insertion point not found")
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit autosave support
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: autosave and resume games in browser"
+          git push
