@@ -17,6 +17,7 @@ page.on("console", message => consoleLines.push(`${message.type()}: ${message.te
 page.on("pageerror", error => pageErrors.push(error.stack || String(error)));
 
 const sha256 = data => createHash("sha256").update(data).digest("hex");
+const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const result = {
   target_url: targetUrl,
   selected_game: null,
@@ -24,12 +25,12 @@ const result = {
   canvas: false,
   controls: [],
   control_profile: null,
+  arcade_stick: false,
+  convex_buttons: false,
   concurrent_hold: false,
   released_inputs: false,
   service_switch_sent: false,
-  screen_changed_after_service: false,
   reset_sent: false,
-  screen_changed_after_reset: false,
   coin_screen_changed: false,
   start_screen_changed: false,
   portrait_controls_separated: false,
@@ -40,38 +41,42 @@ const result = {
   page_errors: pageErrors
 };
 
-const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const pointer = (pointerId, x, y, buttons = 1) => ({
+  pointerId,
+  pointerType: "touch",
+  isPrimary: pointerId === 41,
+  buttons,
+  button: 0,
+  clientX: x,
+  clientY: y
+});
 
 try {
   await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 60000 });
-  await page.waitForFunction(() => {
-    const selected = document.querySelector('#catalog input[name="game"]:checked');
-    return selected?.value === "hoops96-user";
-  }, null, { timeout: 90000, polling: 500 });
+  await page.waitForFunction(() =>
+    document.querySelector('#catalog input[name="game"]:checked')?.value === "hoops96-user",
+    null,
+    { timeout: 90000, polling: 500 }
+  );
 
   await page.check("#agree");
   await page.click("#launch");
-
   await page.waitForFunction(() => {
     const status = document.querySelector("#status")?.textContent || "";
     const error = document.querySelector("#error")?.textContent || "";
     return status.includes("실행 중") || status.includes("실행 실패") || error.length > 0;
   }, null, { timeout: 240000, polling: 500 });
-
   await page.waitForTimeout(9000);
+
   result.final_status = await page.locator("#status").textContent();
   const errorText = await page.locator("#error").textContent();
-  if (errorText || result.final_status.includes("실행 실패")) {
-    throw new Error(errorText || result.final_status);
-  }
+  if (errorText || result.final_status.includes("실행 실패")) throw new Error(errorText || result.final_status);
 
-  const romErrorLines = consoleLines.filter(line =>
+  const romErrors = consoleLines.filter(line =>
     !/Translation not found/i.test(line) &&
     /Failed to start game|missing required files|ROM loading (?:problem|failed)|(?:ROM|file).{0,40}not found/i.test(line)
   );
-  if (romErrorLines.length) {
-    throw new Error(`Core reported a ROM loading problem:\n${romErrorLines.join("\n")}`);
-  }
+  if (romErrors.length) throw new Error(`Core reported a ROM problem:\n${romErrors.join("\n")}`);
 
   const diagnostics = await page.evaluate(() => window.webEmulatorDiagnostics || null);
   result.selected_game = diagnostics?.id || null;
@@ -82,9 +87,7 @@ try {
     result.selected_core !== "mame2003_plus" ||
     result.control_profile !== "arcade" ||
     !diagnostics?.customTouchControls
-  ) {
-    throw new Error(`Unexpected runtime diagnostics: ${JSON.stringify(diagnostics)}`);
-  }
+  ) throw new Error(`Unexpected runtime diagnostics: ${JSON.stringify(diagnostics)}`);
 
   result.canvas = await page.evaluate(() =>
     [...document.querySelectorAll("#game canvas")].some(canvas =>
@@ -94,6 +97,7 @@ try {
   if (!result.canvas) throw new Error("MAME canvas was not detected");
 
   const expectedControls = [
+    ["#direction-control.arcade-stick", "STICK"],
     ["#touch-b1", "B1"],
     ["#touch-b2", "B2"],
     ["#touch-b3", "B3"],
@@ -103,124 +107,108 @@ try {
     ["#touch-start", "START"]
   ];
   for (const [selector, label] of expectedControls) {
-    const control = page.locator(selector);
-    if (!(await control.isVisible())) throw new Error(`${label} touch control is not visible`);
+    if (!(await page.locator(selector).isVisible())) throw new Error(`${label} control is not visible`);
     result.controls.push(label);
   }
 
-  const pointerEvent = (pointerId, pointerType = "touch") => ({
-    pointerId,
-    pointerType,
-    isPrimary: pointerId === 41,
-    buttons: 1,
-    button: 0,
-    clientX: 10,
-    clientY: 10
+  result.arcade_stick = await page.evaluate(() => {
+    const stick = document.querySelector("#direction-control.arcade-stick");
+    const knob = stick?.querySelector(".stick-knob");
+    return Boolean(stick && knob && getComputedStyle(stick).borderRadius === "50%");
   });
+  result.convex_buttons = await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll(".action-pad.arcade .pad-key")];
+    return buttons.length === 3 && buttons.every(button =>
+      getComputedStyle(button).backgroundImage.includes("radial-gradient") &&
+      getComputedStyle(button).borderRadius === "50%"
+    );
+  });
+  if (!result.arcade_stick || !result.convex_buttons) throw new Error("Arcade controller styling was not applied");
 
-  await page.dispatchEvent("#touch-dir-5", "pointerdown", pointerEvent(41));
-  await page.dispatchEvent("#touch-b1", "pointerdown", pointerEvent(42));
+  const stickBox = await page.locator("#direction-control").boundingBox();
+  const b1Box = await page.locator("#touch-b1").boundingBox();
+  if (!stickBox || !b1Box) throw new Error("Control bounding boxes were not found");
+  const stickRight = pointer(41, stickBox.x + stickBox.width * .84, stickBox.y + stickBox.height * .5);
+  const b1Down = pointer(42, b1Box.x + b1Box.width / 2, b1Box.y + b1Box.height / 2);
+
+  await page.dispatchEvent("#direction-control", "pointerdown", stickRight);
+  await page.dispatchEvent("#touch-b1", "pointerdown", b1Down);
   await sleep(350);
-
   let inputEvents = await page.evaluate(() => window.touchControlDiagnostics?.events || []);
   result.concurrent_hold = inputEvents.some(event => event.index === 7 && event.value === 1) &&
     inputEvents.some(event => event.index === 0 && event.value === 1);
-  if (!result.concurrent_hold) {
-    throw new Error(`Concurrent direction/action hold was not recorded: ${JSON.stringify(inputEvents)}`);
-  }
+  if (!result.concurrent_hold) throw new Error(`Concurrent stick/action hold failed: ${JSON.stringify(inputEvents)}`);
 
-  await page.dispatchEvent("#touch-dir-5", "pointerup", { ...pointerEvent(41), buttons: 0 });
-  await page.dispatchEvent("#touch-b1", "pointerup", { ...pointerEvent(42), buttons: 0 });
+  await page.dispatchEvent("#direction-control", "pointerup", { ...stickRight, buttons: 0 });
+  await page.dispatchEvent("#touch-b1", "pointerup", { ...b1Down, buttons: 0 });
   await sleep(250);
   inputEvents = await page.evaluate(() => window.touchControlDiagnostics?.events || []);
   result.released_inputs = inputEvents.some(event => event.index === 7 && event.value === 0) &&
     inputEvents.some(event => event.index === 0 && event.value === 0);
-  if (!result.released_inputs) {
-    throw new Error(`Released inputs were not recorded: ${JSON.stringify(inputEvents)}`);
-  }
+  if (!result.released_inputs) throw new Error(`Input release failed: ${JSON.stringify(inputEvents)}`);
 
   const canvas = page.locator("#game canvas").last();
   const initial = await canvas.screenshot({ path: "smoke-hoops96-before-test.png" });
   await page.locator("#touch-test").tap();
   await page.waitForTimeout(7000);
   const serviceMenu = await canvas.screenshot({ path: "smoke-hoops96-service-menu.png" });
-
-  result.service_switch_sent = await page.evaluate(() =>
-    Number(window.touchControlDiagnostics?.serviceEvents || 0) > 0
-  );
-  result.screen_changed_after_service = sha256(initial) !== sha256(serviceMenu);
-  if (!result.service_switch_sent) throw new Error("TEST control did not dispatch the service switch");
-  if (!result.screen_changed_after_service) {
-    throw new Error("Game canvas did not change after the TEST service switch");
-  }
+  result.service_switch_sent = Number(await page.evaluate(() => window.touchControlDiagnostics?.serviceEvents || 0)) > 0;
+  if (!result.service_switch_sent || sha256(initial) === sha256(serviceMenu)) throw new Error("TEST input did not change the game screen");
 
   await page.locator("#touch-reset").tap();
   await page.waitForTimeout(10000);
   const afterReset = await canvas.screenshot({ path: "smoke-hoops96-after-reset.png" });
-  result.reset_sent = await page.evaluate(() =>
-    Number(window.touchControlDiagnostics?.resetEvents || 0) > 0
-  );
-  result.screen_changed_after_reset = sha256(serviceMenu) !== sha256(afterReset);
-  if (!result.reset_sent) throw new Error("RESET control did not restart the emulator");
-  if (!result.screen_changed_after_reset) {
-    throw new Error("Game canvas did not change after RESET");
-  }
+  result.reset_sent = Number(await page.evaluate(() => window.touchControlDiagnostics?.resetEvents || 0)) > 0;
+  if (!result.reset_sent || sha256(serviceMenu) === sha256(afterReset)) throw new Error("RESET did not restart the game");
 
-  const pulseControl = async (selector, pointerId, duration = 400) => {
-    const down = {
-      pointerId,
-      pointerType: "touch",
-      isPrimary: true,
-      buttons: 1,
-      button: 0,
-      clientX: 10,
-      clientY: 10
-    };
+  const pulse = async (selector, pointerId, duration = 430) => {
+    const box = await page.locator(selector).boundingBox();
+    if (!box) throw new Error(`${selector} bounding box missing`);
+    const down = pointer(pointerId, box.x + box.width / 2, box.y + box.height / 2);
     await page.dispatchEvent(selector, "pointerdown", down);
     await page.waitForTimeout(duration);
     await page.dispatchEvent(selector, "pointerup", { ...down, buttons: 0 });
   };
 
-  await pulseControl("#touch-coin", 51);
+  await pulse("#touch-coin", 51);
   await page.waitForTimeout(1200);
   const afterCoin = await canvas.screenshot({ path: "smoke-hoops96-after-coin.png" });
   result.coin_screen_changed = sha256(afterReset) !== sha256(afterCoin);
 
-  await pulseControl("#touch-start", 52);
+  await pulse("#touch-start", 52);
   await page.waitForTimeout(8000);
   const afterStart = await canvas.screenshot({ path: "smoke-hoops96-after-start.png" });
   result.start_screen_changed = sha256(afterCoin) !== sha256(afterStart);
-  if (!result.coin_screen_changed || !result.start_screen_changed) {
-    throw new Error("Game canvas did not change after held COIN and START inputs");
-  }
+  if (!result.coin_screen_changed || !result.start_screen_changed) throw new Error("COIN or START did not change the game screen");
 
   await page.screenshot({ path: "smoke-hoops96-landscape.png", fullPage: true });
-
   await page.setViewportSize({ width: 430, height: 900 });
   await page.waitForTimeout(1600);
+
   const portrait = await page.evaluate(() => {
     const canvas = [...document.querySelectorAll("#game canvas")]
       .find(item => item.width > 0 && item.height > 0 && getComputedStyle(item).display !== "none");
     const controls = document.querySelector("#touch-controls");
+    const direction = document.querySelector("#direction-control");
     const canvasRect = canvas?.getBoundingClientRect();
     const controlsRect = controls?.getBoundingClientRect();
+    const directionRect = direction?.getBoundingClientRect();
     const buttons = [...document.querySelectorAll("#touch-controls .pad-key")];
     return {
       separated: Boolean(canvasRect && controlsRect && controlsRect.top >= canvasRect.bottom - 2),
       noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
-      controlsInsideViewport: buttons.every(button => {
-        const rect = button.getBoundingClientRect();
-        return rect.left >= -1 && rect.right <= window.innerWidth + 1;
-      }),
-      canvas: canvasRect ? { top: canvasRect.top, bottom: canvasRect.bottom } : null,
-      controls: controlsRect ? { top: controlsRect.top, bottom: controlsRect.bottom } : null
+      controlsInsideViewport: Boolean(directionRect && directionRect.left >= -1 && directionRect.right <= window.innerWidth + 1) &&
+        buttons.every(button => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+        })
     };
   });
   result.portrait_controls_separated = portrait.separated;
   result.portrait_no_horizontal_overflow = portrait.noHorizontalOverflow;
   result.portrait_controls_inside_viewport = portrait.controlsInsideViewport;
   if (!portrait.separated || !portrait.noHorizontalOverflow || !portrait.controlsInsideViewport) {
-    throw new Error(`Portrait touch layout is invalid: ${JSON.stringify(portrait)}`);
+    throw new Error(`Portrait layout invalid: ${JSON.stringify(portrait)}`);
   }
   await page.screenshot({ path: "smoke-hoops96-portrait.png", fullPage: true });
 
