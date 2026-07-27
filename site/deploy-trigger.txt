@@ -1,0 +1,1 @@
+Redeploy catalog after registering user-supplied Hoops '96 ROM.
