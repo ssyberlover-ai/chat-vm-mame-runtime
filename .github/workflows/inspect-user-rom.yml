@@ -1,0 +1,162 @@
+name: Inspect uploaded user ROM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-user-rom.yml"
+      - "site/roms/995793425D21D5C030.zip"
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Inspect archive and identify content
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/libretro/mame2003-plus-libretro.git /tmp/mame2003-plus >/dev/null 2>&1
+          python3 - <<'PY'
+          import json
+          import re
+          import zipfile
+          from pathlib import Path
+
+          archive = Path("site/roms/995793425D21D5C030.zip")
+          if not archive.is_file():
+              raise RuntimeError(f"Missing uploaded archive: {archive}")
+
+          with zipfile.ZipFile(archive) as bundle:
+              entries = [
+                  {
+                      "filename": info.filename,
+                      "size": info.file_size,
+                      "crc32": f"{info.CRC:08x}",
+                  }
+                  for info in bundle.infolist()
+                  if not info.is_dir()
+              ]
+              rom_entries = [
+                  entry for entry in entries
+                  if Path(entry["filename"]).suffix.lower() in {".nes", ".gb", ".gbc", ".gba"}
+              ]
+
+              result = {
+                  "archive": str(archive),
+                  "archive_size": archive.stat().st_size,
+                  "entries": entries,
+                  "detected_type": "unknown",
+                  "suggested_core": None,
+                  "suggested_title": None,
+                  "suggested_rom_name": None,
+                  "mame_candidates": [],
+              }
+
+              if len(rom_entries) == 1:
+                  entry = rom_entries[0]
+                  suffix = Path(entry["filename"]).suffix.lower()
+                  data = bundle.read(entry["filename"])
+                  title = Path(entry["filename"]).stem
+                  if suffix in {".gb", ".gbc"} and len(data) >= 0x150:
+                      raw = data[0x134:0x144]
+                      title = raw.split(b"\0", 1)[0].decode("ascii", "replace").strip() or title
+                      result["detected_type"] = "gameboy"
+                      result["suggested_core"] = "gambatte"
+                  elif suffix == ".gba" and len(data) >= 0xC0:
+                      raw = data[0xA0:0xAC]
+                      title = raw.split(b"\0", 1)[0].decode("ascii", "replace").strip() or title
+                      result["detected_type"] = "gameboy-advance"
+                      result["suggested_core"] = "mgba"
+                  elif suffix == ".nes" and data[:4] == b"NES\x1a":
+                      result["detected_type"] = "nes"
+                      result["suggested_core"] = "fceumm"
+                  result["suggested_title"] = title
+                  result["suggested_rom_name"] = Path(entry["filename"]).stem
+              else:
+                  archive_crcs = {entry["crc32"] for entry in entries if entry["size"] > 0}
+                  source_root = Path("/tmp/mame2003-plus/src/drivers")
+                  game_titles = {}
+                  rom_sets = {}
+
+                  rom_start = re.compile(r"ROM_START\s*\(\s*([A-Za-z0-9_]+)\s*\)")
+                  rom_end = re.compile(r"ROM_END")
+                  crc_pattern = re.compile(r"CRC\s*\(\s*([0-9a-fA-F]{8})\s*\)")
+                  game_pattern = re.compile(
+                      r"GAME(?:X)?\s*\(\s*[^,]+,\s*([A-Za-z0-9_]+)\s*,.*?,\s*\"[^\"]*\"\s*,\s*\"([^\"]+)\""
+                  )
+
+                  for source in source_root.glob("*.c"):
+                      text = source.read_text(encoding="latin-1", errors="ignore")
+                      for match in game_pattern.finditer(text):
+                          game_titles[match.group(1)] = match.group(2)
+
+                      current = None
+                      current_crcs = set()
+                      for line in text.splitlines():
+                          start = rom_start.search(line)
+                          if start:
+                              current = start.group(1)
+                              current_crcs = set()
+                              continue
+                          if current:
+                              for crc in crc_pattern.findall(line):
+                                  current_crcs.add(crc.lower())
+                              if rom_end.search(line):
+                                  if current_crcs:
+                                      rom_sets[current] = current_crcs
+                                  current = None
+                                  current_crcs = set()
+
+                  candidates = []
+                  for shortname, expected in rom_sets.items():
+                      overlap = archive_crcs & expected
+                      if not overlap:
+                          continue
+                      archive_coverage = len(overlap) / max(len(archive_crcs), 1)
+                      set_coverage = len(overlap) / max(len(expected), 1)
+                      score = len(overlap) * 1000 + archive_coverage * 100 + set_coverage
+                      candidates.append({
+                          "shortname": shortname,
+                          "title": game_titles.get(shortname, shortname),
+                          "matching_roms": len(overlap),
+                          "archive_roms": len(archive_crcs),
+                          "set_roms": len(expected),
+                          "archive_coverage": round(archive_coverage, 4),
+                          "set_coverage": round(set_coverage, 4),
+                          "score": round(score, 4),
+                      })
+
+                  candidates.sort(key=lambda item: item["score"], reverse=True)
+                  result["mame_candidates"] = candidates[:10]
+                  if candidates:
+                      best = candidates[0]
+                      result["detected_type"] = "mame"
+                      result["suggested_core"] = "mame2003_plus"
+                      result["suggested_title"] = best["title"]
+                      result["suggested_rom_name"] = best["shortname"]
+
+          Path("user-rom-inspection.json").write_text(
+              json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Commit inspection result
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add user-rom-inspection.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: record uploaded ROM inspection"
+          git push
