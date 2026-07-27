@@ -183,6 +183,8 @@ body.touch-ui #touch-controls{display:block}
     profile: null,
     serviceEvents: 0,
     resetEvents: 0,
+    coinEvents: 0,
+    startEvents: 0,
     events: inputEvents
   };
 
@@ -299,8 +301,8 @@ body.touch-ui #touch-controls{display:block}
       systemPad.append(
         inputButton({ id: "touch-test", label: "TEST", hint: "초기 설정", key: "F2", className: "test-key" }),
         inputButton({ id: "touch-reset", label: "RESET", hint: "재부팅", command: "restart" }),
-        inputButton({ id: "touch-coin", label: "COIN", inputs: [2] }),
-        inputButton({ id: "touch-start", label: "START", inputs: [3] })
+        inputButton({ id: "touch-coin", label: "COIN", command: "coin" }),
+        inputButton({ id: "touch-start", label: "START", command: "start" })
       );
     } else {
       if (game.core === "mgba") {
@@ -315,7 +317,7 @@ body.touch-ui #touch-controls{display:block}
       );
       systemPad.append(
         inputButton({ id: "touch-select", label: "SELECT", inputs: [2] }),
-        inputButton({ id: "touch-start", label: "START", inputs: [3] })
+        inputButton({ id: "touch-start", label: "START", command: "start" })
       );
     }
 
@@ -380,6 +382,16 @@ body.touch-ui #touch-controls{display:block}
     return event;
   }
 
+  function sendMameKey(key, code, keyCode, duration = 220) {
+    const emulator = window.EJS_emulator;
+    const manager = emulator?.gameManager;
+    try { manager?.functions?.setKeyboardEnabled?.(1); } catch {}
+    const target = emulator?.canvas || document.querySelector("#game canvas") || document;
+    try { target.focus?.({ preventScroll: true }); } catch { target.focus?.(); }
+    target.dispatchEvent(createKeyboardEvent("keydown", key, code, keyCode));
+    setTimeout(() => target.dispatchEvent(createKeyboardEvent("keyup", key, code, keyCode)), duration);
+  }
+
   function sendServiceSwitch() {
     const emulator = window.EJS_emulator;
     const manager = emulator?.gameManager;
@@ -401,6 +413,20 @@ body.touch-ui #touch-controls{display:block}
       pointerStates.set(event.pointerId, { button, indexes: [] });
       window.EJS_emulator?.gameManager?.restart?.();
       window.touchControlDiagnostics.resetEvents += 1;
+      return;
+    }
+    if (button.dataset.command === "coin") {
+      button.classList.add("is-pressed");
+      pointerStates.set(event.pointerId, { button, indexes: [] });
+      sendMameKey("5", "Digit5", 53);
+      window.touchControlDiagnostics.coinEvents += 1;
+      return;
+    }
+    if (button.dataset.command === "start") {
+      button.classList.add("is-pressed");
+      pointerStates.set(event.pointerId, { button, indexes: [] });
+      sendMameKey("1", "Digit1", 49);
+      window.touchControlDiagnostics.startEvents += 1;
       return;
     }
     if (button.dataset.key === "F2") {
