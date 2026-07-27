@@ -59,8 +59,10 @@ jobs:
           nintendo_logo = bytes.fromhex(
               "CEED6666CC0D000B03730083000C000D"
               "0008111F8889000EDCCC6EE6DDDDD999"
-              "BBBB67636E0EECCCDDC999FBBB933E"
+              "BBBB67636E0EECCCDDDC999FBBB9333E"
           )
+          if len(nintendo_logo) != 48:
+              raise RuntimeError(f"Nintendo logo constant must be 48 bytes, got {len(nintendo_logo)}")
 
           games = [
               {
@@ -207,7 +209,7 @@ jobs:
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "418982982+github-actions[bot]@users.noreply.github.com"
           git add site/roms notices/open-roms/LICENSES.md
           if git diff --cached --quiet; then
             echo "Open ROM catalog is already current."
