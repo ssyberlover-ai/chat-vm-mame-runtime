@@ -1,0 +1,77 @@
+name: Test registered Hoops 96 ROM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-hoops96.yml"
+      - "scripts/smoke_test_user_rom.mjs"
+      - "site/roms/hoops96.zip"
+      - "site/roms/manifest.json"
+      - "site/index.html"
+
+permissions:
+  contents: write
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Wait for Pages deployment
+        run: sleep 45
+      - name: Run Hoops 96 browser test
+        id: test
+        continue-on-error: true
+        env:
+          SMOKE_URL: https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user&test=${{ github.run_id }}
+        run: node scripts/smoke_test_user_rom.mjs
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoops96-smoke-${{ github.run_id }}
+          path: |
+            smoke-hoops96-result.json
+            smoke-hoops96.png
+            smoke-hoops96-failure.png
+          if-no-files-found: ignore
+      - name: Record result
+        if: always()
+        env:
+          OUTCOME: ${{ steps.test.outcome }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git pull --rebase origin main
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          details = {}
+          path = Path("smoke-hoops96-result.json")
+          if path.exists():
+              details = json.loads(path.read_text(encoding="utf-8"))
+          Path("hoops96-smoke-status.json").write_text(
+              json.dumps({
+                  "result": os.environ["OUTCOME"],
+                  "run_url": os.environ["RUN_URL"],
+                  "details": details,
+              }, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hoops96-smoke-status.json
+          git commit -m "chore: record Hoops 96 smoke test" || true
+          git push
+      - name: Fail when test failed
+        if: steps.test.outcome != 'success'
+        run: exit 1
