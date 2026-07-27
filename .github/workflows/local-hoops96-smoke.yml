@@ -71,6 +71,10 @@ jobs:
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
           python3 - <<'PY'
           import json
           import os
@@ -90,9 +94,7 @@ jobs:
               encoding="utf-8",
           )
           PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+
           git add local-hoops96-status.json
           git commit -m "chore: record adaptive Hoops 96 smoke test" || true
           git push
