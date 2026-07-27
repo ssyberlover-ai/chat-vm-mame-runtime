@@ -1,307 +1,492 @@
 "use strict";
 
-const ASSETS = {
-  bios: "./bios/seabios.bin",
-  vga: "./bios/vgabios.bin",
-  freedos: "./images/freedos722.img",
-  hdaGzip: "./images/mame-hda.img.gz",
-  hdaRaw: "./images/mame-hda.img",
-  robbyRaw: "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip",
-  robbyApi: "https://api.github.com/repos/mamedev/www.mamedev.org/contents/roms/robby/robby.zip?ref=e27034c7eb14717f287a789ffde35593a4c162f6"
-};
-
-const $ = selector => document.querySelector(selector);
-const statusNode = $("#status");
-const progressNode = $("#progress");
-const errorNode = $("#error");
-const coverNode = $("#cover");
-let emulator = null;
-let prepared = null;
-let paused = false;
-
-function setStatus(text, progress) {
-  statusNode.textContent = text;
-  if (typeof progress === "number") {
-    progressNode.hidden = false;
-    progressNode.value = progress;
-  }
-}
-
-function showError(error) {
-  console.error(error);
-  setStatus("실행 실패");
-  errorNode.textContent = error?.stack || String(error);
-  $("#start").disabled = false;
-}
-
-async function fetchBytes(url, label) {
-  setStatus(`${label} 불러오는 중…`);
-  const response = await fetch(url, { cache: "no-store", redirect: "follow" });
-  if (!response.ok) throw new Error(`${label}: HTTP ${response.status}\n${url}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (!bytes.length) throw new Error(`${label}: 빈 응답`);
-  return bytes;
-}
-
-async function fetchRobby() {
-  try {
-    return await fetchBytes(ASSETS.robbyRaw, "Robby Roto ROM");
-  } catch (rawError) {
-    console.warn("Raw ROM fetch failed; using Contents API", rawError);
-    const response = await fetch(ASSETS.robbyApi, {
-      headers: { Accept: "application/vnd.github+json" },
-      cache: "no-store"
-    });
-    if (!response.ok) throw new Error(`Robby Roto ROM: GitHub API HTTP ${response.status}`);
-    const payload = await response.json();
-    if (payload.encoding !== "base64" || !payload.content) {
-      throw new Error("Robby Roto ROM: Base64 콘텐츠 없음");
-    }
-    const clean = payload.content.replace(/\s/g, "");
-    return Uint8Array.from(atob(clean), character => character.charCodeAt(0));
-  }
-}
-
-async function loadHda() {
-  if ("DecompressionStream" in window) {
-    const compressed = await fetchBytes(ASSETS.hdaGzip, "MAME 실행 디스크");
-    setStatus("MAME 실행 디스크 해제 중…");
-    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
-  }
-  return fetchBytes(ASSETS.hdaRaw, "MAME 실행 디스크");
-}
-
-function put16(bytes, offset, value) {
-  bytes[offset] = value & 0xff;
-  bytes[offset + 1] = value >>> 8 & 0xff;
-}
-
-function put32(bytes, offset, value) {
-  put16(bytes, offset, value & 0xffff);
-  put16(bytes, offset + 2, Math.floor(value / 65536));
-}
-
-function putAscii(bytes, offset, text, length) {
-  for (let index = 0; index < length; index += 1) {
-    bytes[offset + index] = index < text.length ? text.charCodeAt(index) & 0xff : 0x20;
-  }
-}
-
-function makeRomDisk(romBytes) {
-  const bps = 512;
-  const spc = 2;
-  const partitionStart = 63;
-  const totalSectors = 16 * 2048;
-  const partitionSectors = totalSectors - partitionStart;
-  const rootEntries = 512;
-  const rootSectors = Math.ceil(rootEntries * 32 / bps);
-  const reserved = 1;
-  const fats = 2;
-  let fatSectors = 1;
-  let clusterCount = 0;
-
-  for (let iteration = 0; iteration < 10; iteration += 1) {
-    clusterCount = Math.floor((partitionSectors - reserved - fats * fatSectors - rootSectors) / spc);
-    fatSectors = Math.ceil((clusterCount + 2) * 2 / bps);
-  }
-
-  const disk = new Uint8Array(totalSectors * bps);
-  const p = 446;
-  disk[p + 4] = 0x06;
-  put32(disk, p + 8, partitionStart);
-  put32(disk, p + 12, partitionSectors);
-  disk[510] = 0x55;
-  disk[511] = 0xaa;
-
-  const boot = partitionStart * bps;
-  disk.set([0xeb, 0x3c, 0x90], boot);
-  putAscii(disk, boot + 3, "MSDOS5.0", 8);
-  put16(disk, boot + 11, bps);
-  disk[boot + 13] = spc;
-  put16(disk, boot + 14, reserved);
-  disk[boot + 16] = fats;
-  put16(disk, boot + 17, rootEntries);
-  put16(disk, boot + 19, 0);
-  disk[boot + 21] = 0xf8;
-  put16(disk, boot + 22, fatSectors);
-  put16(disk, boot + 24, 63);
-  put16(disk, boot + 26, 16);
-  put32(disk, boot + 28, partitionStart);
-  put32(disk, boot + 32, partitionSectors);
-  disk[boot + 36] = 0x81;
-  disk[boot + 38] = 0x29;
-  put32(disk, boot + 39, 0x524f4242);
-  putAscii(disk, boot + 43, "ROBBY ROM", 11);
-  putAscii(disk, boot + 54, "FAT16", 8);
-  disk[boot + 510] = 0x55;
-  disk[boot + 511] = 0xaa;
-
-  const fatStart = partitionStart + reserved;
-  const rootStart = fatStart + fats * fatSectors;
-  const dataStart = rootStart + rootSectors;
-  const clusterBytes = spc * bps;
-  const count = Math.max(1, Math.ceil(romBytes.length / clusterBytes));
-  const fat = new Uint16Array(fatSectors * bps / 2);
-  fat[0] = 0xfff8;
-  fat[1] = 0xffff;
-  for (let index = 0; index < count; index += 1) {
-    fat[2 + index] = index === count - 1 ? 0xffff : 3 + index;
-  }
-
-  const root = rootStart * bps;
-  putAscii(disk, root, "ROBBY", 8);
-  putAscii(disk, root + 8, "ZIP", 3);
-  disk[root + 11] = 0x20;
-  put16(disk, root + 26, 2);
-  put32(disk, root + 28, romBytes.length);
-  disk.set(romBytes, dataStart * bps);
-
-  const fatBytes = new Uint8Array(fat.buffer);
-  for (let index = 0; index < fats; index += 1) {
-    disk.set(fatBytes.subarray(0, fatSectors * bps), (fatStart + index * fatSectors) * bps);
-  }
-  return disk;
-}
-
-async function prepareAssets() {
-  if (typeof window.V86Starter !== "function") {
-    throw new Error("v86 런타임을 불러오지 못했습니다.");
-  }
-
-  setStatus("실행 자산 준비 중…", 5);
-  const [bios, vga, freedos, hda, robby] = await Promise.all([
-    fetchBytes(ASSETS.bios, "SeaBIOS"),
-    fetchBytes(ASSETS.vga, "VGA BIOS"),
-    fetchBytes(ASSETS.freedos, "FreeDOS"),
-    loadHda(),
-    fetchRobby()
-  ]);
-  setStatus("Robby Roto ROM 디스크 생성 중…", 72);
-  prepared = { bios, vga, freedos, hda, hdb: makeRomDisk(robby) };
-}
-
-async function bootVm() {
-  if (!prepared) throw new Error("실행 자산이 준비되지 않았습니다.");
-  if (emulator) {
-    try {
-      await emulator.stop();
-      emulator.destroy();
-    } catch (error) {
-      console.warn(error);
-    }
-  }
-
-  errorNode.textContent = "";
-  coverNode.hidden = true;
-  setStatus("FreeDOS 부팅 중…", 82);
-  emulator = new V86Starter({
-    memory_size: 64 * 1024 * 1024,
-    vga_memory_size: 4 * 1024 * 1024,
-    screen_container: $("#screen_container"),
-    bios: { buffer: prepared.bios.buffer },
-    vga_bios: { buffer: prepared.vga.buffer },
-    fda: { buffer: prepared.freedos.buffer },
-    hda: { buffer: prepared.hda.buffer },
-    hdb: { buffer: prepared.hdb.buffer },
-    boot_order: 0x213,
-    autostart: true,
-    disable_mouse: true,
-    disable_speaker: true
-  });
-
-  window.mameVm = emulator;
-  emulator.add_listener("emulator-ready", () => setStatus("VM 실행 중 · FreeDOS 부팅 대기", 90));
-
-  const markReady = () => {
-    setStatus("준비 완료 · Robby Roto 실행을 누르세요", 100);
-    setTimeout(() => { progressNode.hidden = true; }, 600);
-    ["#run", "#info", "#reboot", "#pause", "#full", "#command", "#send"]
-      .forEach(selector => { $(selector).disabled = false; });
-    $("#screen_container").focus();
+(() => {
+  const ROBBY = {
+    id: "robby",
+    title: "Robby Roto",
+    platform: "Arcade",
+    core: "mame2003_plus",
+    url: "https://raw.githubusercontent.com/mamedev/www.mamedev.org/e27034c7eb14717f287a789ffde35593a4c162f6/roms/robby/robby.zip",
+    license: "MAMEdev 비상업 사용",
+    developer: "Bally/Midway",
+    release_date: "1981",
+    source_page: "https://www.mamedev.org/roms/robby/",
+    hosted: false,
+    control_profile: "arcade"
   };
 
-  if (typeof emulator.wait_until_vga_screen_contains === "function") {
-    emulator.wait_until_vga_screen_contains("A:\\>")
-      .then(markReady)
-      .catch(() => setTimeout(markReady, 14000));
-  } else {
-    setTimeout(markReady, 14000);
+  const $ = selector => document.querySelector(selector);
+  const catalogNode = $("#catalog");
+  const agree = $("#agree");
+  const agreeText = $("#agree-text");
+  const launch = $("#launch");
+  const shell = $("#game-shell");
+  const status = $("#status");
+  const selection = $("#selection");
+  const error = $("#error");
+  const touchControls = $("#touch-controls");
+  const directionControl = $("#direction-control");
+  const systemPad = $("#system-pad");
+  const actionPad = $("#action-pad");
+
+  let games = [ROBBY];
+  let selected = null;
+  let loading = false;
+  const inputRefs = new Map();
+  const pointerStates = new Map();
+  const inputEvents = [];
+
+  window.touchControlDiagnostics = {
+    visible: false,
+    profile: null,
+    serviceEvents: 0,
+    resetEvents: 0,
+    coinEvents: 0,
+    startEvents: 0,
+    stickEvents: 0,
+    events: inputEvents
+  };
+
+  function fail(reason) {
+    console.error(reason);
+    status.textContent = "실행 실패";
+    error.textContent = reason?.stack || String(reason);
+    launch.disabled = !agree.checked || !selected;
+    loading = false;
   }
-}
 
-function typeText(text) {
-  if (!emulator) return;
-  emulator.keyboard_send_text(text, 20);
-  $("#screen_container").focus();
-}
-
-$("#agree").addEventListener("change", event => {
-  $("#start").disabled = !event.target.checked;
-});
-
-$("#start").addEventListener("click", async () => {
-  $("#start").disabled = true;
-  try {
-    await prepareAssets();
-    await bootVm();
-  } catch (error) {
-    showError(error);
+  function escapeText(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "\"": "&quot;",
+      "'": "&#39;"
+    })[character]);
   }
-});
 
-$("#run").addEventListener("click", () => {
-  typeText("C:\nPLAY.BAT\n");
-  setStatus("Robby Roto 실행 명령 전송");
-});
-$("#info").addEventListener("click", () => typeText("C:\nMAMEINFO.BAT\n"));
-$("#reboot").addEventListener("click", () => bootVm().catch(showError));
-$("#pause").addEventListener("click", async () => {
-  if (!emulator) return;
-  if (paused) {
-    emulator.run();
-    paused = false;
-    $("#pause").textContent = "일시정지";
-  } else {
-    await emulator.stop();
-    paused = true;
-    $("#pause").textContent = "계속";
+  function isTouchEnvironment() {
+    const params = new URLSearchParams(location.search);
+    return params.get("touch") === "1" || navigator.maxTouchPoints > 0 || matchMedia("(pointer: coarse)").matches;
   }
-});
-$("#full").addEventListener("click", () => emulator?.screen_go_fullscreen());
-$("#send").addEventListener("click", () => {
-  typeText($("#command").value + "\n");
-  $("#command").value = "";
-});
-$("#command").addEventListener("keydown", event => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    $("#send").click();
+
+  function renderCatalog() {
+    catalogNode.innerHTML = games.map(game => {
+      const source = game.source_page
+        ? `<a class="game-source" href="${escapeText(game.source_page)}" target="_blank" rel="noopener">출처·라이선스 확인</a>`
+        : "";
+      const hosted = game.hosted === false ? "공식 원격 파일" : "저장소 포함";
+      const licenseClass = game.user_supplied ? "game-license user" : "game-license";
+      const licenseText = game.user_supplied ? "사용자 제공 ROM" : game.license;
+      return `<label class="game-card">
+        <input type="radio" name="game" value="${escapeText(game.id)}">
+        <span class="game-title">${escapeText(game.title)}</span>
+        <span class="game-meta">${escapeText(game.platform)} · ${escapeText(game.developer)}<br>${hosted}${game.release_date ? ` · ${escapeText(game.release_date)}` : ""}</span>
+        <span class="${licenseClass}">${escapeText(licenseText)}</span>
+        ${source}
+      </label>`;
+    }).join("");
+
+    catalogNode.querySelectorAll('input[name="game"]').forEach(input => {
+      input.addEventListener("change", () => selectGame(input.value));
+    });
+
+    const requested = new URLSearchParams(location.search).get("game");
+    const preferred = games.find(game => game.id === requested)
+      || games.find(game => game.id === "cybercoaster")
+      || games[0];
+    const input = catalogNode.querySelector(`input[value="${CSS.escape(preferred.id)}"]`);
+    if (input) {
+      input.checked = true;
+      selectGame(preferred.id);
+    }
   }
-});
 
-const scanCodes = {
-  up: [0xe0, 0x48, 0xe0, 0xc8],
-  down: [0xe0, 0x50, 0xe0, 0xd0],
-  left: [0xe0, 0x4b, 0xe0, 0xcb],
-  right: [0xe0, 0x4d, 0xe0, 0xcd],
-  enter: [0x1c, 0x9c],
-  esc: [0x01, 0x81],
-  ctrl: [0x1d, 0x9d],
-  alt: [0x38, 0xb8],
-  space: [0x39, 0xb9],
-  "1": [0x02, 0x82],
-  "5": [0x06, 0x86],
-  o: [0x18, 0x98],
-  k: [0x25, 0xa5]
-};
+  function selectGame(id) {
+    selected = games.find(game => game.id === id) || null;
+    agree.checked = false;
+    launch.disabled = true;
+    error.textContent = "";
+    if (!selected) return;
+    agreeText.textContent = selected.user_supplied
+      ? `${selected.title} ROM을 직접 제공했으며 사용할 권한이 있음을 확인합니다.`
+      : `${selected.title}의 ${selected.license} 조건과 저작권 고지를 확인했습니다.`;
+    selection.textContent = `${selected.title} · ${selected.platform}`;
+    status.textContent = "게임 선택 완료";
+  }
 
-for (const button of document.querySelectorAll("[data-key]")) {
-  button.addEventListener("pointerdown", event => {
-    event.preventDefault();
-    emulator?.keyboard_send_scancodes(scanCodes[button.dataset.key], 15);
-    $("#screen_container").focus();
+  agree.addEventListener("change", () => {
+    launch.disabled = !agree.checked || loading || !selected;
   });
-}
 
-window.addEventListener("error", event => showError(event.error || event.message));
+  function inputButton({ id, label, hint = "", inputs = [], key = "", command = "", className = "" }) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = id;
+    button.className = `pad-key ${className}`.trim();
+    button.dataset.inputs = inputs.join(",");
+    if (key) button.dataset.key = key;
+    if (command) button.dataset.command = command;
+    button.setAttribute("aria-label", hint ? `${label} ${hint}` : label);
+    button.innerHTML = `<span>${escapeText(label)}${hint ? `<span class="control-hint">${escapeText(hint)}</span>` : ""}</span>`;
+    return button;
+  }
+
+  function simulateInput(index, value) {
+    const manager = window.EJS_emulator?.gameManager;
+    if (!manager?.simulateInput) return false;
+    manager.simulateInput(0, index, value);
+    inputEvents.push({ index, value, at: Date.now() });
+    if (inputEvents.length > 120) inputEvents.splice(0, inputEvents.length - 120);
+    return true;
+  }
+
+  function sameIndexes(left, right) {
+    return left.length === right.length && left.every((value, index) => value === right[index]);
+  }
+
+  function holdInputs(pointerId, button, indexes) {
+    const previous = pointerStates.get(pointerId);
+    if (previous && previous.button === button && sameIndexes(previous.indexes, indexes)) return;
+    releasePointer(pointerId);
+    for (const index of indexes) {
+      const count = inputRefs.get(index) || 0;
+      inputRefs.set(index, count + 1);
+      if (count === 0) simulateInput(index, 1);
+    }
+    pointerStates.set(pointerId, { button, indexes });
+    button.classList.add("is-pressed");
+    if (button.closest(".action-pad.arcade")) {
+      try { navigator.vibrate?.(12); } catch {}
+    }
+  }
+
+  function releasePointer(pointerId) {
+    const state = pointerStates.get(pointerId);
+    if (!state) return;
+    for (const index of state.indexes) {
+      const next = Math.max(0, (inputRefs.get(index) || 1) - 1);
+      if (next === 0) {
+        inputRefs.delete(index);
+        simulateInput(index, 0);
+      } else {
+        inputRefs.set(index, next);
+      }
+    }
+    state.button.classList.remove("is-pressed");
+    pointerStates.delete(pointerId);
+  }
+
+  function centerArcadeStick() {
+    const stick = directionControl.querySelector(".arcade-stick");
+    if (!stick) return;
+    stick.style.setProperty("--stick-x", "0px");
+    stick.style.setProperty("--stick-y", "0px");
+    stick.classList.remove("is-pressed");
+  }
+
+  function releaseAllInputs() {
+    for (const pointerId of [...pointerStates.keys()]) releasePointer(pointerId);
+    for (const index of [...inputRefs.keys()]) simulateInput(index, 0);
+    inputRefs.clear();
+    touchControls.querySelectorAll(".is-pressed").forEach(button => button.classList.remove("is-pressed"));
+    centerArcadeStick();
+  }
+
+  function arcadeStickInputs(dx, dy, deadZone) {
+    if (Math.hypot(dx, dy) < deadZone) return [];
+    const sector = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+    return [[7], [5, 7], [5], [5, 6], [6], [4, 6], [4], [4, 7]][sector];
+  }
+
+  function buildArcadeStick() {
+    directionControl.className = "control-surface arcade-stick";
+    directionControl.setAttribute("aria-label", "8방향 아케이드 스틱");
+    const cross = document.createElement("span");
+    cross.className = "stick-cross";
+    const knob = document.createElement("span");
+    knob.className = "stick-knob";
+    directionControl.replaceChildren(cross, knob);
+    centerArcadeStick();
+
+    const update = event => {
+      const rect = directionControl.getBoundingClientRect();
+      const dx = event.clientX - (rect.left + rect.width / 2);
+      const dy = event.clientY - (rect.top + rect.height / 2);
+      const distance = Math.hypot(dx, dy);
+      const maxTravel = rect.width * .255;
+      const scale = distance > maxTravel ? maxTravel / distance : 1;
+      directionControl.style.setProperty("--stick-x", `${dx * scale}px`);
+      directionControl.style.setProperty("--stick-y", `${dy * scale}px`);
+      directionControl.classList.add("is-pressed");
+      holdInputs(event.pointerId, directionControl, arcadeStickInputs(dx, dy, rect.width * .15));
+      window.touchControlDiagnostics.stickEvents += 1;
+    };
+
+    directionControl.onpointerdown = event => {
+      event.preventDefault();
+      try { directionControl.setPointerCapture(event.pointerId); } catch {}
+      update(event);
+      try { navigator.vibrate?.(8); } catch {}
+    };
+    directionControl.onpointermove = event => {
+      if (pointerStates.get(event.pointerId)?.button === directionControl) update(event);
+    };
+    const stop = event => {
+      releasePointer(event.pointerId);
+      centerArcadeStick();
+    };
+    directionControl.onpointerup = stop;
+    directionControl.onpointercancel = stop;
+    directionControl.onlostpointercapture = stop;
+  }
+
+  function buildConsoleDpad() {
+    directionControl.className = "control-surface console-dpad";
+    directionControl.setAttribute("aria-label", "8방향 패드");
+    const directions = [
+      ["↖", [4, 6], "왼쪽 위"], ["↑", [4], "위"], ["↗", [4, 7], "오른쪽 위"],
+      ["←", [6], "왼쪽"], ["", [], ""], ["→", [7], "오른쪽"],
+      ["↙", [5, 6], "왼쪽 아래"], ["↓", [5], "아래"], ["↘", [5, 7], "오른쪽 아래"]
+    ];
+    directionControl.replaceChildren(...directions.map(([label, inputs, hint], index) => {
+      if (!inputs.length) {
+        const center = document.createElement("span");
+        center.className = "dpad-center";
+        return center;
+      }
+      return inputButton({ id: `touch-dir-${index}`, label, hint, inputs, className: "direction-key" });
+    }));
+    directionControl.onpointerdown = null;
+    directionControl.onpointermove = null;
+    directionControl.onpointerup = null;
+    directionControl.onpointercancel = null;
+    directionControl.onlostpointercapture = null;
+  }
+
+  function buildTouchControls(game) {
+    systemPad.replaceChildren();
+    actionPad.replaceChildren();
+    const arcade = game.control_profile === "arcade";
+    actionPad.className = `action-pad ${arcade ? "arcade" : "console"}`;
+
+    if (arcade) {
+      buildArcadeStick();
+      actionPad.append(
+        inputButton({ id: "touch-b1", label: "B1", hint: "버튼 1", inputs: [0], className: "action-1" }),
+        inputButton({ id: "touch-b2", label: "B2", hint: "버튼 2", inputs: [8], className: "action-2" }),
+        inputButton({ id: "touch-b3", label: "B3", hint: "버튼 3", inputs: [1], className: "action-3" })
+      );
+      systemPad.append(
+        inputButton({ id: "touch-test", label: "TEST", hint: "초기 설정", key: "F2", className: "test-key" }),
+        inputButton({ id: "touch-reset", label: "RESET", hint: "재부팅", command: "restart" }),
+        inputButton({ id: "touch-coin", label: "COIN", command: "coin" }),
+        inputButton({ id: "touch-start", label: "START", command: "start" })
+      );
+    } else {
+      buildConsoleDpad();
+      if (game.core === "mgba") {
+        actionPad.append(
+          inputButton({ id: "touch-l", label: "L", inputs: [10], className: "shoulder" }),
+          inputButton({ id: "touch-r", label: "R", inputs: [11], className: "shoulder" })
+        );
+      }
+      actionPad.append(
+        inputButton({ id: "touch-b", label: "B", inputs: [0] }),
+        inputButton({ id: "touch-a", label: "A", inputs: [8] })
+      );
+      systemPad.append(
+        inputButton({ id: "touch-select", label: "SELECT", inputs: [2] }),
+        inputButton({ id: "touch-start", label: "START", inputs: [3] })
+      );
+    }
+
+    const visible = isTouchEnvironment();
+    document.body.classList.toggle("touch-ui", visible);
+    touchControls.hidden = !visible;
+    window.touchControlDiagnostics.visible = visible;
+    window.touchControlDiagnostics.profile = arcade ? "arcade" : "console";
+  }
+
+  function createKeyboardEvent(type, key, code, keyCode) {
+    const event = new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true });
+    try {
+      Object.defineProperties(event, {
+        keyCode: { get: () => keyCode },
+        which: { get: () => keyCode }
+      });
+    } catch {}
+    return event;
+  }
+
+  function sendMameKey(key, code, keyCode, duration = 260) {
+    const emulator = window.EJS_emulator;
+    const manager = emulator?.gameManager;
+    try { manager?.functions?.setKeyboardEnabled?.(1); } catch {}
+    const target = emulator?.canvas || document.querySelector("#game canvas") || document;
+    try { target.focus?.({ preventScroll: true }); } catch { target.focus?.(); }
+    target.dispatchEvent(createKeyboardEvent("keydown", key, code, keyCode));
+    setTimeout(() => target.dispatchEvent(createKeyboardEvent("keyup", key, code, keyCode)), duration);
+  }
+
+  function runCommand(button) {
+    const command = button.dataset.command;
+    if (command === "restart") {
+      window.EJS_emulator?.gameManager?.restart?.();
+      window.touchControlDiagnostics.resetEvents += 1;
+    } else if (command === "coin") {
+      sendMameKey("5", "Digit5", 53, 420);
+      window.touchControlDiagnostics.coinEvents += 1;
+    } else if (command === "start") {
+      sendMameKey("1", "Digit1", 49, 420);
+      window.touchControlDiagnostics.startEvents += 1;
+    } else if (button.dataset.key === "F2") {
+      sendMameKey("F2", "F2", 113, 180);
+      window.touchControlDiagnostics.serviceEvents += 1;
+    }
+  }
+
+  touchControls.addEventListener("pointerdown", event => {
+    const button = event.target.closest(".pad-key");
+    if (!button || !touchControls.contains(button)) return;
+    event.preventDefault();
+    try { button.setPointerCapture(event.pointerId); } catch {}
+    if (button.dataset.command || button.dataset.key) {
+      button.classList.add("is-pressed");
+      pointerStates.set(event.pointerId, { button, indexes: [] });
+      runCommand(button);
+      try { navigator.vibrate?.(10); } catch {}
+      return;
+    }
+    const indexes = button.dataset.inputs.split(",").filter(Boolean).map(Number);
+    if (indexes.length) holdInputs(event.pointerId, button, indexes);
+  });
+
+  touchControls.addEventListener("pointermove", event => {
+    const state = pointerStates.get(event.pointerId);
+    if (!state || !state.button.classList.contains("direction-key")) return;
+    const next = document.elementFromPoint(event.clientX, event.clientY)?.closest(".direction-key");
+    if (!next || next === state.button) return;
+    holdInputs(event.pointerId, next, next.dataset.inputs.split(",").filter(Boolean).map(Number));
+  });
+
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    touchControls.addEventListener(type, event => releasePointer(event.pointerId));
+  }
+  window.addEventListener("blur", releaseAllInputs);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) releaseAllInputs();
+  });
+
+  function disableBuiltInVirtualGamepad() {
+    const emulator = window.EJS_emulator;
+    if (!emulator) return;
+    try { emulator.toggleVirtualGamepad?.(false); } catch {}
+    try { emulator.changeSettingOption?.("virtual-gamepad", "disabled", true); } catch {}
+    if (emulator.virtualGamepad) emulator.virtualGamepad.style.display = "none";
+  }
+
+  function startSelectedGame() {
+    if (loading || !agree.checked || !selected) return;
+    loading = true;
+    launch.disabled = true;
+    status.textContent = `${selected.title} 코어 로딩 중…`;
+    error.textContent = "";
+    shell.hidden = false;
+    document.body.classList.add("running");
+    buildTouchControls(selected);
+
+    window.EJS_player = "#game";
+    window.EJS_core = selected.core;
+    window.EJS_gameName = selected.rom_name || (selected.id === "robby" ? "robby" : selected.title);
+    window.EJS_gameUrl = selected.url;
+    window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
+    window.EJS_startOnLoaded = true;
+    window.EJS_fullscreenOnLoaded = false;
+    window.EJS_controlScheme = selected.control_profile === "arcade" ? "mame" : undefined;
+    window.EJS_gameID = selected.id;
+    window.EJS_backgroundColor = "#000";
+    window.EJS_disableAutoLang = true;
+    window.EJS_language = "en-US";
+    window.EJS_askBeforeExit = false;
+    window.EJS_noAutoFocus = false;
+    window.EJS_AdUrl = "";
+    if (isTouchEnvironment()) window.EJS_browserMode = "mobile";
+    window.EJS_VirtualGamepadSettings = [];
+    window.EJS_Buttons = {
+      playPause: true,
+      restart: true,
+      mute: true,
+      settings: true,
+      fullscreen: true,
+      saveState: true,
+      loadState: true,
+      screenRecord: false,
+      gamepad: true,
+      cheat: false,
+      volume: true,
+      saveSavFiles: false,
+      loadSavFiles: false,
+      quickSave: true,
+      quickLoad: true,
+      screenshot: true,
+      cacheManager: false,
+      exitEmulation: false
+    };
+
+    window.EJS_ready = () => {
+      disableBuiltInVirtualGamepad();
+      status.textContent = "코어 준비 완료";
+    };
+    window.EJS_onGameStart = () => {
+      loading = false;
+      disableBuiltInVirtualGamepad();
+      setTimeout(disableBuiltInVirtualGamepad, 250);
+      setTimeout(disableBuiltInVirtualGamepad, 1000);
+      status.textContent = `${selected.title} 실행 중`;
+      window.webEmulatorDiagnostics = {
+        ready: true,
+        id: selected.id,
+        core: selected.core,
+        hosted: selected.hosted !== false,
+        hasEmulator: Boolean(window.EJS_emulator),
+        customTouchControls: window.touchControlDiagnostics.visible,
+        controlProfile: window.touchControlDiagnostics.profile
+      };
+    };
+
+    const loader = document.createElement("script");
+    loader.src = "https://cdn.emulatorjs.org/4.2.3/data/loader.js";
+    loader.async = true;
+    loader.onerror = () => fail(new Error("EmulatorJS 로더를 가져오지 못했습니다."));
+    document.body.appendChild(loader);
+  }
+
+  window.addEventListener("error", event => {
+    const message = String(event.error?.message || event.message || "");
+    if (/Wake Lock permission request denied/i.test(message)) return;
+    if (loading) fail(event.error || event.message);
+  });
+
+  launch.addEventListener("click", startSelectedGame);
+
+  (async () => {
+    try {
+      const response = await fetch("./roms/manifest.json", { cache: "no-store" });
+      if (!response.ok) throw new Error(`ROM 카탈로그 HTTP ${response.status}`);
+      const manifest = await response.json();
+      const hostedGames = manifest.games.map(game => ({
+        ...game,
+        hosted: true,
+        control_profile: game.control_profile || (game.core === "mame2003_plus" ? "arcade" : "console")
+      }));
+      games = [...hostedGames, ROBBY];
+      status.textContent = `${hostedGames.length}개 ROM 준비 완료`;
+    } catch (reason) {
+      console.warn(reason);
+      status.textContent = "ROM 목록 실패 · Robby Roto만 사용 가능";
+      games = [ROBBY];
+    }
+    renderCatalog();
+  })();
+})();
