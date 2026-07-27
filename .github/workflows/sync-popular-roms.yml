@@ -1,0 +1,213 @@
+name: Sync popular officially distributed ROMs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/sync-popular-roms.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-popular-roms
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download official release ROMs
+        run: |
+          set -euo pipefail
+          mkdir -p site/roms notices/open-roms /tmp/popular-roms
+
+          fetch() {
+            local url="$1"
+            local output="$2"
+            curl --fail --location --silent --show-error \
+              --retry 8 --retry-delay 3 --retry-all-errors \
+              -A "chat-vm-popular-rom-sync/1.0" \
+              "$url" --output "$output"
+            test -s "$output"
+          }
+
+          release_asset_url() {
+            local repository="$1"
+            local suffix="$2"
+            local reject_text="${3:-}"
+            local release_json
+            release_json="$(mktemp)"
+            fetch "https://api.github.com/repos/${repository}/releases/latest" "$release_json"
+            python3 - "$release_json" "$suffix" "$reject_text" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          release = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          suffix = sys.argv[2].lower()
+          reject = sys.argv[3].lower()
+          candidates = [
+              asset for asset in release.get("assets", [])
+              if str(asset.get("name", "")).lower().endswith(suffix)
+          ]
+          if reject:
+              preferred = [
+                  asset for asset in candidates
+                  if reject not in str(asset.get("name", "")).lower()
+              ]
+              if preferred:
+                  candidates = preferred
+          if not candidates:
+              raise SystemExit(
+                  f"No {suffix} release asset found for {release.get('html_url', 'unknown release')}"
+              )
+          candidates.sort(key=lambda asset: str(asset.get("name", "")).lower())
+          print(candidates[0]["browser_download_url"])
+          PY
+            rm -f "$release_json"
+          }
+
+          super_url="$(release_asset_url "sgadrat/super-tilt-bro" ".nes")"
+          fetch "$super_url" "site/roms/super-tilt-bro.nes"
+
+          minicraft_url="$(release_asset_url "Vulcalien/minicraft-gba" ".zip" "sram-32kb")"
+          fetch "$minicraft_url" "/tmp/popular-roms/minicraft-gba.zip"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path("/tmp/popular-roms/minicraft-gba.zip")
+          output = Path("site/roms/minicraft-gba.gba")
+          with ZipFile(archive) as bundle:
+              candidates = [info for info in bundle.infolist() if not info.is_dir() and info.filename.lower().endswith(".gba")]
+              if not candidates:
+                  raise RuntimeError("Minicraft release archive does not contain a .gba ROM")
+              candidates.sort(key=lambda info: info.file_size, reverse=True)
+              output.write_bytes(bundle.read(candidates[0]))
+          PY
+
+          fetch "https://sanqui.net/etc/2048.gb" "site/roms/2048-gb.gb"
+
+      - name: Validate ROMs and update catalog
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path("site/roms")
+          manifest_path = root / "manifest.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          popular = [
+              {
+                  "id": "super-tilt-bro",
+                  "title": "Super Tilt Bro",
+                  "platform": "NES",
+                  "core": "fceumm",
+                  "file": "super-tilt-bro.nes",
+                  "license": "WTFPL-2.0",
+                  "developer": "Sylvain Gadrat",
+                  "release_date": "2026-01-31",
+                  "source_page": "https://sgadrat.itch.io/super-tilt-bro",
+                  "source_code": "https://github.com/sgadrat/super-tilt-bro",
+              },
+              {
+                  "id": "minicraft-gba",
+                  "title": "Minicraft GBA",
+                  "platform": "Game Boy Advance",
+                  "core": "mgba",
+                  "file": "minicraft-gba.gba",
+                  "license": "GPL-3.0-or-later",
+                  "developer": "Vulcalien",
+                  "release_date": "2026-02-19",
+                  "source_page": "https://github.com/Vulcalien/minicraft-gba/releases/latest",
+                  "source_code": "https://github.com/Vulcalien/minicraft-gba",
+              },
+              {
+                  "id": "2048-gb",
+                  "title": "2048-gb",
+                  "platform": "Game Boy",
+                  "core": "gambatte",
+                  "file": "2048-gb.gb",
+                  "license": "Zlib",
+                  "developer": "Sanqui",
+                  "release_date": "2014",
+                  "source_page": "https://github.com/Sanqui/2048-gb",
+                  "source_code": "https://github.com/Sanqui/2048-gb",
+              },
+          ]
+
+          for game in popular:
+              path = root / game["file"]
+              data = path.read_bytes()
+              suffix = path.suffix.lower()
+              if len(data) < 16 * 1024:
+                  raise RuntimeError(f"ROM is unexpectedly small: {path} ({len(data)} bytes)")
+              if suffix == ".nes" and data[:4] != b"NES\x1a":
+                  raise RuntimeError(f"Invalid iNES header: {path}")
+              if suffix == ".gb" and len(data) < 0x150:
+                  raise RuntimeError(f"Invalid Game Boy ROM: {path}")
+              if suffix == ".gba" and (len(data) < 32 * 1024 or data[0xB2] != 0x96):
+                  raise RuntimeError(f"Invalid Game Boy Advance header: {path}")
+              game["size_bytes"] = len(data)
+              game["sha256"] = hashlib.sha256(data).hexdigest()
+              game["url"] = f"./roms/{game['file']}"
+
+          popular_ids = {game["id"] for game in popular}
+          existing = [game for game in manifest.get("games", []) if game.get("id") not in popular_ids]
+          manifest["schema_version"] = 2
+          manifest["generated_at"] = datetime.now(timezone.utc).isoformat()
+          manifest["policy"] = "Officially distributed homebrew ROMs are included only when their license permits redistribution."
+          manifest["games"] = popular + existing
+          manifest_path.write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(manifest, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Write popular ROM notices
+        run: |
+          cat > notices/open-roms/POPULAR-ROM-NOTICES.md <<'EOF'
+          # Popular officially distributed ROM notices
+
+          ## Super Tilt Bro
+          - Developer: Sylvain Gadrat
+          - Official free ROM: https://sgadrat.itch.io/super-tilt-bro
+          - Source: https://github.com/sgadrat/super-tilt-bro
+          - License: WTFPL version 2
+
+          ## Minicraft GBA
+          - Developer: Vulcalien
+          - Official release: https://github.com/Vulcalien/minicraft-gba/releases/latest
+          - Source: https://github.com/Vulcalien/minicraft-gba
+          - License: GNU GPL version 3 or later
+
+          ## 2048-gb
+          - Developer: Sanqui
+          - Official binary: https://sanqui.net/etc/2048.gb
+          - Source: https://github.com/Sanqui/2048-gb
+          - License: zlib
+          EOF
+
+      - name: Commit verified popular ROMs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/roms notices/open-roms/POPULAR-ROM-NOTICES.md
+          if git diff --cached --quiet; then
+            echo "Popular ROM catalog is already current."
+            exit 0
+          fi
+          git commit -m "feat: add popular officially distributed ROM catalog"
+          git push
