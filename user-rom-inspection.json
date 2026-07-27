@@ -1,0 +1,77 @@
+{
+  "archive": "site/roms/995793425D21D5C030.zip",
+  "archive_size": 7554162,
+  "entries": [
+    {
+      "filename": "sz01-0.2b",
+      "size": 524288,
+      "crc32": "b9679d7b"
+    },
+    {
+      "filename": "sz00-0.2a",
+      "size": 524288,
+      "crc32": "971b4376"
+    },
+    {
+      "filename": "rr02-0.6h",
+      "size": 131072,
+      "crc32": "9490041c"
+    },
+    {
+      "filename": "mce-05.6a",
+      "size": 4194304,
+      "crc32": "e7a9355a"
+    },
+    {
+      "filename": "mce-04.8n",
+      "size": 2097152,
+      "crc32": "91da9b4f"
+    },
+    {
+      "filename": "mce-03.10m",
+      "size": 2097152,
+      "crc32": "756c282e"
+    },
+    {
+      "filename": "mce-02.4e",
+      "size": 2097152,
+      "crc32": "be7ff8ba"
+    },
+    {
+      "filename": "mce-01.8m",
+      "size": 2097152,
+      "crc32": "6817d0c6"
+    },
+    {
+      "filename": "mce-00.2e",
+      "size": 2097152,
+      "crc32": "11b9bd96"
+    }
+  ],
+  "detected_type": "mame",
+  "suggested_core": "mame2003_plus",
+  "suggested_title": "Hoops '96 (Europe/Asia 2.0)",
+  "suggested_rom_name": "hoops96",
+  "mame_candidates": [
+    {
+      "shortname": "hoops96",
+      "title": "Hoops '96 (Europe/Asia 2.0)",
+      "matching_roms": 9,
+      "archive_roms": 9,
+      "set_roms": 10,
+      "archive_coverage": 1.0,
+      "set_coverage": 0.9,
+      "score": 9100.9
+    },
+    {
+      "shortname": "ddream95",
+      "title": "Dunk Dream '95 (Japan 1.4 EAM)",
+      "matching_roms": 7,
+      "archive_roms": 9,
+      "set_roms": 10,
+      "archive_coverage": 0.7778,
+      "set_coverage": 0.7,
+      "score": 7078.4778
+    }
+  ]
+}
