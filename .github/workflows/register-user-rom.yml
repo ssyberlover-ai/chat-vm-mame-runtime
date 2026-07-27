@@ -1,0 +1,90 @@
+name: Register uploaded Hoops 96 ROM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/register-user-rom.yml"
+      - "site/roms/995793425D21D5C030.zip"
+
+permissions:
+  contents: write
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Rename and register uploaded ROM
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          source = Path("site/roms/995793425D21D5C030.zip")
+          target = Path("site/roms/hoops96.zip")
+          manifest_path = Path("site/roms/manifest.json")
+
+          if source.exists():
+              shutil.copyfile(source, target)
+          elif not target.exists():
+              raise RuntimeError("Neither the uploaded source archive nor hoops96.zip exists")
+
+          data = target.read_bytes()
+          entry = {
+              "id": "hoops96-user",
+              "title": "Hoops '96 (Europe/Asia 2.0)",
+              "platform": "Arcade",
+              "core": "mame2003_plus",
+              "file": "hoops96.zip",
+              "rom_name": "hoops96",
+              "license": "User-supplied ROM",
+              "developer": "Data East",
+              "release_date": "1996",
+              "source_page": None,
+              "source_code": None,
+              "size_bytes": len(data),
+              "sha256": hashlib.sha256(data).hexdigest(),
+              "url": "./roms/hoops96.zip",
+              "control_profile": "arcade",
+              "user_supplied": True,
+              "rights_verified": False,
+          }
+
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          games = [
+              game for game in manifest.get("games", [])
+              if game.get("id") != entry["id"] and game.get("file") != entry["file"]
+          ]
+          manifest["generated_at"] = datetime.now(timezone.utc).isoformat()
+          manifest["games"] = [entry, *games]
+          manifest_path.write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(entry, ensure_ascii=False, indent=2))
+          PY
+
+          if [ -f site/roms/995793425D21D5C030.zip ]; then
+            git rm site/roms/995793425D21D5C030.zip
+          fi
+
+      - name: Commit catalog registration
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/roms/hoops96.zip site/roms/manifest.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "feat: register user-supplied Hoops 96 ROM"
+          git push
