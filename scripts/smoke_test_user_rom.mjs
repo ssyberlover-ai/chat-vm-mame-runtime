@@ -28,6 +28,9 @@ const result = {
   released_inputs: false,
   service_switch_sent: false,
   screen_changed_after_service: false,
+  portrait_controls_separated: false,
+  portrait_no_horizontal_overflow: false,
+  portrait_controls_inside_viewport: false,
   final_status: "",
   console: consoleLines,
   page_errors: pageErrors
@@ -146,10 +149,38 @@ try {
     throw new Error("Game canvas did not change after the TEST service switch");
   }
 
+  await page.screenshot({ path: "smoke-hoops96-landscape.png", fullPage: true });
+
+  await page.setViewportSize({ width: 430, height: 900 });
+  await page.waitForTimeout(1600);
+  const portrait = await page.evaluate(() => {
+    const canvas = [...document.querySelectorAll("#game canvas")]
+      .find(item => item.width > 0 && item.height > 0 && getComputedStyle(item).display !== "none");
+    const controls = document.querySelector("#touch-controls");
+    const canvasRect = canvas?.getBoundingClientRect();
+    const controlsRect = controls?.getBoundingClientRect();
+    const buttons = [...document.querySelectorAll("#touch-controls .pad-key")];
+    return {
+      separated: Boolean(canvasRect && controlsRect && controlsRect.top >= canvasRect.bottom - 2),
+      noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      controlsInsideViewport: buttons.every(button => {
+        const rect = button.getBoundingClientRect();
+        return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+      }),
+      canvas: canvasRect ? { top: canvasRect.top, bottom: canvasRect.bottom } : null,
+      controls: controlsRect ? { top: controlsRect.top, bottom: controlsRect.bottom } : null
+    };
+  });
+  result.portrait_controls_separated = portrait.separated;
+  result.portrait_no_horizontal_overflow = portrait.noHorizontalOverflow;
+  result.portrait_controls_inside_viewport = portrait.controlsInsideViewport;
+  if (!portrait.separated || !portrait.noHorizontalOverflow || !portrait.controlsInsideViewport) {
+    throw new Error(`Portrait touch layout is invalid: ${JSON.stringify(portrait)}`);
+  }
+  await page.screenshot({ path: "smoke-hoops96-portrait.png", fullPage: true });
+
   const fatalErrors = pageErrors.filter(message => !/Wake Lock permission request denied/i.test(message));
   if (fatalErrors.length) throw new Error(`Browser errors:\n${fatalErrors.join("\n\n")}`);
-
-  await page.screenshot({ path: "smoke-hoops96-full.png", fullPage: true });
 } catch (error) {
   result.error = error.stack || String(error);
   await page.screenshot({ path: "smoke-hoops96-failure.png", fullPage: true }).catch(() => {});
