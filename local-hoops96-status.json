@@ -1,12 +1,13 @@
 {
-  "result": "failure",
-  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30261401082",
+  "result": "success",
+  "run_url": "https://github.com/ssyberlover-ai/chat-vm-mame-runtime/actions/runs/30261469424",
   "details": {
     "target_url": "http://127.0.0.1:8000/?game=hoops96-user&touch=1",
     "selected_game": "hoops96-user",
     "selected_core": "mame2003_plus",
     "canvas": true,
     "controls": [
+      "STICK",
       "B1",
       "B2",
       "B3",
@@ -16,17 +17,17 @@
       "START"
     ],
     "control_profile": "arcade",
-    "concurrent_hold": false,
-    "released_inputs": false,
-    "service_switch_sent": false,
-    "screen_changed_after_service": false,
-    "reset_sent": false,
-    "screen_changed_after_reset": false,
-    "coin_screen_changed": false,
-    "start_screen_changed": false,
-    "portrait_controls_separated": false,
-    "portrait_no_horizontal_overflow": false,
-    "portrait_controls_inside_viewport": false,
+    "arcade_stick": true,
+    "convex_buttons": true,
+    "concurrent_hold": true,
+    "released_inputs": true,
+    "service_switch_sent": true,
+    "reset_sent": true,
+    "coin_screen_changed": true,
+    "start_screen_changed": true,
+    "portrait_controls_separated": true,
+    "portrait_no_horizontal_overflow": true,
+    "portrait_controls_inside_viewport": true,
     "final_status": "Hoops '96 (Europe/Asia 2.0) 실행 중",
     "console": [
       "log: Loading language en-US",
@@ -44,9 +45,9 @@
       "log: Translation not found for '-1'. Language set to 'en-US'",
       "log: Translation not found for '+1'. Language set to 'en-US'",
       "warning: Virtual gamepad settings is empty! Using default gamepad settings",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000FC2C0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000D40D0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
       "warning: Warning: Enlarging memory arrays, this is not fast! 16777216,33554432",
-      "warning: enlarged memory arrays from 16777216 to 33554432, took 5 ms (has ArrayBuffer.transfer? false)",
+      "warning: enlarged memory arrays from 16777216 to 33554432, took 4 ms (has ArrayBuffer.transfer? false)",
       "log: Translation not found for 'Core (Requires restart)'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Source'. Language set to 'en-US'",
       "log: Translation not found for 'Screenshot Format'. Language set to 'en-US'",
@@ -62,15 +63,14 @@
       "log: Translation not found for 'Direct Keyboard Input'. Language set to 'en-US'",
       "log: Translation not found for 'Forward Alt key'. Language set to 'en-US'",
       "log: Translation not found for 'Lock Mouse'. Language set to 'en-US'",
-      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000FC2C0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
-      "warning: [.WebGL-0x5f408336300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x5f408336300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x5f408336300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
-      "warning: [.WebGL-0x5f408336300]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+      "warning: [GroupMarkerNotSet(crbug.com/242999)!:A0702000D40D0000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.",
+      "warning: [.WebGL-0x18ec00da6900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x18ec00da6900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x18ec00da6900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "warning: [.WebGL-0x18ec00da6900]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
     ],
     "page_errors": [
       "NotAllowedError: Wake Lock permission request denied"
-    ],
-    "error": "page.dispatchEvent: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('#touch-dir-5')\n\n    at /home/runner/work/chat-vm-mame-runtime/chat-vm-mame-runtime/scripts/smoke_test_user_rom.mjs:121:14"
+    ]
   }
 }
