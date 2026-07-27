@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 
 const targetUrl = process.env.SMOKE_URL || "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user";
@@ -15,12 +16,15 @@ const pageErrors = [];
 page.on("console", message => consoleLines.push(`${message.type()}: ${message.text()}`));
 page.on("pageerror", error => pageErrors.push(error.stack || String(error)));
 
+const sha256 = data => createHash("sha256").update(data).digest("hex");
 const result = {
   target_url: targetUrl,
   selected_game: null,
   selected_core: null,
   canvas: false,
   controls: [],
+  service_switch_sent: false,
+  screen_changed_after_service: false,
   final_status: "",
   console: consoleLines,
   page_errors: pageErrors
@@ -88,10 +92,16 @@ try {
     throw new Error(`Arcade controls were not all visible: ${JSON.stringify(result.controls)}`);
   }
 
+  const before = await page.screenshot({ path: "smoke-hoops96-before-test.png", fullPage: true });
+  await page.locator("#game canvas").last().click({ position: { x: 20, y: 20 } }).catch(() => {});
+  await page.keyboard.press("F2");
+  result.service_switch_sent = true;
+  await page.waitForTimeout(6000);
+  const after = await page.screenshot({ path: "smoke-hoops96.png", fullPage: true });
+  result.screen_changed_after_service = sha256(before) !== sha256(after);
+
   const fatalErrors = pageErrors.filter(message => !/Wake Lock permission request denied/i.test(message));
   if (fatalErrors.length) throw new Error(`Browser errors:\n${fatalErrors.join("\n\n")}`);
-
-  await page.screenshot({ path: "smoke-hoops96.png", fullPage: true });
 } catch (error) {
   result.error = error.stack || String(error);
   await page.screenshot({ path: "smoke-hoops96-failure.png", fullPage: true }).catch(() => {});
