@@ -30,7 +30,8 @@ const result = {
   screen_changed_after_service: false,
   reset_sent: false,
   screen_changed_after_reset: false,
-  coin_start_screen_changed: false,
+  coin_screen_changed: false,
+  start_screen_changed: false,
   portrait_controls_separated: false,
   portrait_no_horizontal_overflow: false,
   portrait_controls_inside_viewport: false,
@@ -165,14 +166,32 @@ try {
     throw new Error("Game canvas did not change after RESET");
   }
 
-  await page.locator("#touch-coin").tap();
-  await page.waitForTimeout(700);
-  await page.locator("#touch-start").tap();
-  await page.waitForTimeout(7000);
-  const afterCoinStart = await canvas.screenshot({ path: "smoke-hoops96-after-coin-start.png" });
-  result.coin_start_screen_changed = sha256(afterReset) !== sha256(afterCoinStart);
-  if (!result.coin_start_screen_changed) {
-    throw new Error("Game canvas did not change after COIN and START inputs");
+  const pulseControl = async (selector, pointerId, duration = 400) => {
+    const down = {
+      pointerId,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      button: 0,
+      clientX: 10,
+      clientY: 10
+    };
+    await page.dispatchEvent(selector, "pointerdown", down);
+    await page.waitForTimeout(duration);
+    await page.dispatchEvent(selector, "pointerup", { ...down, buttons: 0 });
+  };
+
+  await pulseControl("#touch-coin", 51);
+  await page.waitForTimeout(1200);
+  const afterCoin = await canvas.screenshot({ path: "smoke-hoops96-after-coin.png" });
+  result.coin_screen_changed = sha256(afterReset) !== sha256(afterCoin);
+
+  await pulseControl("#touch-start", 52);
+  await page.waitForTimeout(8000);
+  const afterStart = await canvas.screenshot({ path: "smoke-hoops96-after-start.png" });
+  result.start_screen_changed = sha256(afterCoin) !== sha256(afterStart);
+  if (!result.coin_screen_changed || !result.start_screen_changed) {
+    throw new Error("Game canvas did not change after held COIN and START inputs");
   }
 
   await page.screenshot({ path: "smoke-hoops96-landscape.png", fullPage: true });
