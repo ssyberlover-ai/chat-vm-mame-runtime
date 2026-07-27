@@ -208,7 +208,7 @@ body.running #preflight{display:none}
 
     window.EJS_player = "#game";
     window.EJS_core = selected.core;
-    window.EJS_gameName = selected.id === "robby" ? "robby" : selected.title;
+    window.EJS_gameName = selected.rom_name || (selected.id === "robby" ? "robby" : selected.title);
     window.EJS_gameUrl = selected.url;
     window.EJS_pathtodata = "https://cdn.emulatorjs.org/4.2.3/data/";
     window.EJS_startOnLoaded = true;
@@ -271,7 +271,11 @@ body.running #preflight{display:none}
       const response = await fetch("./roms/manifest.json", { cache: "no-store" });
       if (!response.ok) throw new Error(`ROM 카탈로그 HTTP ${response.status}`);
       const manifest = await response.json();
-      const hostedGames = manifest.games.map(game => ({ ...game, hosted: true, control_profile: "console" }));
+      const hostedGames = manifest.games.map(game => ({
+  ...game,
+  hosted: true,
+  control_profile: game.control_profile || (game.core === "mame2003_plus" ? "arcade" : "console")
+}));
       games = [...hostedGames, ROBBY];
       status.textContent = `${hostedGames.length}개 오픈 ROM 준비 완료`;
     } catch (reason) {
