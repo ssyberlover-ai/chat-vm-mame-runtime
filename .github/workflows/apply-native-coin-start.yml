@@ -1,0 +1,106 @@
+name: Apply native coin start
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-native-coin-start.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Patch arcade system inputs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("site/index.html")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          output = []
+          inserted_helper = False
+          inserted_commands = False
+
+          for line in lines:
+              stripped = line.strip()
+
+              if stripped == "resetEvents: 0,":
+                  output.append(line)
+                  output.append("    coinEvents: 0,")
+                  output.append("    startEvents: 0,")
+                  continue
+
+              if 'id: "touch-coin"' in line and 'inputs: [2]' in line:
+                  output.append(line.replace('inputs: [2]', 'command: "coin"'))
+                  continue
+
+              if 'id: "touch-start"' in line and 'inputs: [3]' in line and len(line) - len(line.lstrip()) == 8:
+                  output.append(line.replace('inputs: [3]', 'command: "start"'))
+                  continue
+
+              if stripped == "function sendServiceSwitch() {" and not inserted_helper:
+                  output.extend([
+                      "  function sendMameKey(key, code, keyCode, duration = 220) {",
+                      "    const emulator = window.EJS_emulator;",
+                      "    const manager = emulator?.gameManager;",
+                      "    try { manager?.functions?.setKeyboardEnabled?.(1); } catch {}",
+                      '    const target = emulator?.canvas || document.querySelector("#game canvas") || document;',
+                      "    try { target.focus?.({ preventScroll: true }); } catch { target.focus?.(); }",
+                      '    target.dispatchEvent(createKeyboardEvent("keydown", key, code, keyCode));',
+                      '    setTimeout(() => target.dispatchEvent(createKeyboardEvent("keyup", key, code, keyCode)), duration);',
+                      "  }",
+                      "",
+                  ])
+                  inserted_helper = True
+
+              if stripped == 'if (button.dataset.key === "F2") {' and not inserted_commands:
+                  output.extend([
+                      '    if (button.dataset.command === "coin") {',
+                      '      button.classList.add("is-pressed");',
+                      '      pointerStates.set(event.pointerId, { button, indexes: [] });',
+                      '      sendMameKey("5", "Digit5", 53);',
+                      '      window.touchControlDiagnostics.coinEvents += 1;',
+                      '      return;',
+                      '    }',
+                      '    if (button.dataset.command === "start") {',
+                      '      button.classList.add("is-pressed");',
+                      '      pointerStates.set(event.pointerId, { button, indexes: [] });',
+                      '      sendMameKey("1", "Digit1", 49);',
+                      '      window.touchControlDiagnostics.startEvents += 1;',
+                      '      return;',
+                      '    }',
+                  ])
+                  inserted_commands = True
+
+              output.append(line)
+
+          result = "\n".join(output) + "\n"
+          checks = [
+              'coinEvents: 0',
+              'command: "coin"',
+              'command: "start"',
+              'function sendMameKey',
+              'sendMameKey("5", "Digit5", 53)',
+              'sendMameKey("1", "Digit1", 49)',
+          ]
+          missing = [item for item in checks if item not in result]
+          if missing:
+              raise SystemExit(f"Patch verification failed: {missing}")
+          path.write_text(result, encoding="utf-8")
+          PY
+
+      - name: Commit corrected inputs
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html
+          git commit -m "fix: route arcade COIN and START through MAME keys"
+          git push
