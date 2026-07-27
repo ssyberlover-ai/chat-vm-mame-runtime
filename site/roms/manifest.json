@@ -1,8 +1,27 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-07-27T00:53:45.403499+00:00",
+  "generated_at": "2026-07-27T01:03:44.321895+00:00",
   "policy": "Officially distributed homebrew ROMs are included only when their license permits redistribution.",
   "games": [
+    {
+      "id": "hoops96-user",
+      "title": "Hoops '96 (Europe/Asia 2.0)",
+      "platform": "Arcade",
+      "core": "mame2003_plus",
+      "file": "hoops96.zip",
+      "rom_name": "hoops96",
+      "license": "User-supplied ROM",
+      "developer": "Data East",
+      "release_date": "1996",
+      "source_page": null,
+      "source_code": null,
+      "size_bytes": 7554162,
+      "sha256": "da6670fc86e3f545000faa4530fbab30940c76b41142a7c6a8fd3c9af2d41ab1",
+      "url": "./roms/hoops96.zip",
+      "control_profile": "arcade",
+      "user_supplied": true,
+      "rights_verified": false
+    },
     {
       "id": "minicraft-gba",
       "title": "Minicraft GBA",
