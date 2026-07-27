@@ -14,8 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: local-hoops96-smoke
-  cancel-in-progress: true
+  group: local-hoops96-smoke-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
