@@ -1,0 +1,144 @@
+name: Apply arcade controller patch v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/arcade-controller-patch-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Patch controller UI
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          import traceback
+          from pathlib import Path
+
+          status = {"result": "failure"}
+          try:
+              path = Path("site/index.html")
+              text = path.read_text(encoding="utf-8")
+
+              text, count = re.subn(
+                  r'\.dpad\{display:grid;.*?\.dpad-center\{border:0;background:rgba\(17,28,45,\.45\);pointer-events:none\}\n',
+                  '''.arcade-stick{--stick-x:0px;--stick-y:0px;position:relative;aspect-ratio:1;width:min(42vw,205px);border-radius:50%;border:2px solid rgba(180,203,235,.5);background:radial-gradient(circle at 48% 42%,rgba(71,89,116,.78) 0 36%,rgba(16,25,40,.94) 68%,rgba(3,7,13,.98) 100%);box-shadow:inset 0 7px 18px rgba(255,255,255,.12),inset 0 -14px 24px rgba(0,0,0,.72),0 10px 24px rgba(0,0,0,.48);touch-action:none;pointer-events:auto}\n.arcade-stick::before{content:"";position:absolute;inset:13%;clip-path:polygon(29% 0,71% 0,100% 29%,100% 71%,71% 100%,29% 100%,0 71%,0 29%);background:linear-gradient(145deg,rgba(109,130,163,.42),rgba(10,18,30,.72));box-shadow:inset 0 0 0 2px rgba(196,215,244,.2),inset 0 0 22px rgba(0,0,0,.65)}\n.arcade-stick::after{content:"8 WAY";position:absolute;left:50%;bottom:5%;transform:translateX(-50%);font:700 9px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.16em;color:rgba(208,220,239,.5);pointer-events:none}\n.stick-cross{position:absolute;inset:24%;border-radius:50%;background:linear-gradient(90deg,transparent 47%,rgba(216,228,246,.13) 48% 52%,transparent 53%),linear-gradient(transparent 47%,rgba(216,228,246,.13) 48% 52%,transparent 53%);pointer-events:none}\n.stick-knob{position:absolute;z-index:3;left:50%;top:50%;width:39%;aspect-ratio:1;border-radius:50%;transform:translate(calc(-50% + var(--stick-x)),calc(-50% + var(--stick-y)));background:radial-gradient(circle at 34% 27%,#ffd0c9 0 7%,#ee695c 13%,#c72f29 40%,#74100f 74%,#260404 100%);border:3px solid rgba(255,190,184,.34);box-shadow:inset 0 7px 9px rgba(255,255,255,.3),inset 0 -12px 16px rgba(50,0,0,.55),0 7px 0 #3d0808,0 13px 22px rgba(0,0,0,.64);will-change:transform;pointer-events:none}\n.arcade-stick.is-pressed .stick-knob{filter:saturate(1.14)}\n.pad-key{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;padding:0;border:1px solid rgba(197,216,247,.42);background:rgba(18,31,51,.78);color:#fff;box-shadow:none;touch-action:none}\n.pad-key.is-pressed{background:rgba(73,137,224,.92);transform:scale(.96)}\n''',
+                  text,
+                  count=1,
+                  flags=re.S,
+              )
+              if count != 1:
+                  raise RuntimeError(f"direction CSS replacements={count}")
+
+              text, count = re.subn(
+                  r'\.action-pad\{display:grid;align-items:center;justify-items:center;gap:8px;width:min\(42vw,220px\)\}\n\.action-pad\.arcade\{.*?\.action-pad \.action-3\{grid-column:2;grid-row:2\}\n',
+                  '''.action-pad{display:grid;align-items:center;justify-items:center;gap:8px;width:min(42vw,220px)}\n.action-pad.arcade{position:relative;display:block;aspect-ratio:1.16;width:min(43vw,230px);filter:drop-shadow(0 12px 15px rgba(0,0,0,.34))}\n.action-pad.console{grid-template-columns:repeat(2,1fr);grid-template-rows:auto auto}\n.action-pad .pad-key{width:clamp(64px,17vw,86px);height:clamp(64px,17vw,86px);border-radius:50%;font-size:18px}\n.action-pad.arcade .pad-key{position:absolute;width:clamp(70px,18vw,92px);height:clamp(70px,18vw,92px);border:5px solid rgba(255,255,255,.22);font-size:20px;font-weight:950;letter-spacing:.04em;text-shadow:0 2px 2px rgba(0,0,0,.45);box-shadow:inset 0 8px 9px rgba(255,255,255,.34),inset 0 -11px 13px rgba(0,0,0,.34),0 7px 0 var(--button-rim),0 12px 18px rgba(0,0,0,.48);background:radial-gradient(circle at 35% 27%,var(--button-highlight) 0 8%,var(--button-face) 22%,var(--button-dark) 78%,var(--button-rim) 100%);transition:transform .04s linear,box-shadow .04s linear,filter .04s linear}\n.action-pad.arcade .pad-key.is-pressed{transform:translateY(5px) scale(.98);box-shadow:inset 0 5px 9px rgba(255,255,255,.2),inset 0 -7px 10px rgba(0,0,0,.38),0 2px 0 var(--button-rim),0 5px 10px rgba(0,0,0,.42);filter:saturate(1.2) brightness(.95)}\n.action-pad.arcade .action-1{--button-highlight:#ffc4bb;--button-face:#e94e42;--button-dark:#a61917;--button-rim:#4f0909;left:0;bottom:2%}\n.action-pad.arcade .action-2{--button-highlight:#fff0a6;--button-face:#f3ca35;--button-dark:#ad7604;--button-rim:#5c3700;left:38%;top:0}\n.action-pad.arcade .action-3{--button-highlight:#c4ddff;--button-face:#4b8ee9;--button-dark:#1853a4;--button-rim:#082a61;right:0;bottom:13%}\n''',
+                  text,
+                  count=1,
+                  flags=re.S,
+              )
+              if count != 1:
+                  raise RuntimeError(f"action CSS replacements={count}")
+
+              simple = {
+                  'body.touch-ui .dpad{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}': 'body.touch-ui .arcade-stick{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}',
+                  '  .dpad{width:min(29vw,43vh,190px)}': '  .arcade-stick{width:min(29vw,43vh,190px)}',
+                  '<div id="dpad" class="dpad" aria-label="8방향 패드"></div>': '<div id="dpad" class="arcade-stick" aria-label="8방향 아케이드 스틱"></div>',
+                  '모바일 가로 화면에서는 패드가 게임 위에 반투명으로 표시되고, 세로 화면에서는 게임 아래에 분리됩니다. 방향과 액션 버튼은 동시에 길게 누를 수 있습니다.': '모바일 가로 화면에서는 원형 아케이드 스틱과 볼록한 3버튼이 게임 위에 표시되고, 세로 화면에서는 게임 아래에 분리됩니다. 레버와 버튼은 동시에 길게 누를 수 있습니다.',
+                  '    buildDpad();': '    buildArcadeStick();',
+              }
+              for old, new in simple.items():
+                  if old not in text:
+                      raise RuntimeError(f"missing simple target: {old[:70]}")
+                  text = text.replace(old, new, 1)
+
+              pattern = r'  function buildDpad\(\) \{.*?\n  \}\n\n  function buildTouchControls'
+              replacement = '''  function centerArcadeStick() {
+    dpad.style.setProperty("--stick-x", "0px");
+    dpad.style.setProperty("--stick-y", "0px");
+    dpad.classList.remove("is-pressed");
+  }
+
+  function arcadeStickInputs(dx, dy, deadZone) {
+    if (Math.hypot(dx, dy) < deadZone) return [];
+    const sector = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+    return [[7], [5, 7], [5], [5, 6], [6], [4, 6], [4], [4, 7]][sector];
+  }
+
+  function updateArcadeStick(event) {
+    const rect = dpad.getBoundingClientRect();
+    const dx = event.clientX - (rect.left + rect.width / 2);
+    const dy = event.clientY - (rect.top + rect.height / 2);
+    const distance = Math.hypot(dx, dy);
+    const maxTravel = rect.width * .255;
+    const scale = distance > maxTravel ? maxTravel / distance : 1;
+    dpad.style.setProperty("--stick-x", `${dx * scale}px`);
+    dpad.style.setProperty("--stick-y", `${dy * scale}px`);
+    dpad.classList.add("is-pressed");
+    const indexes = arcadeStickInputs(dx, dy, rect.width * .15);
+    const previous = pointerStates.get(event.pointerId);
+    if (previous && previous.button === dpad && previous.indexes.join(",") === indexes.join(",")) return;
+    holdInputs(event.pointerId, dpad, indexes);
+  }
+
+  function buildArcadeStick() {
+    dpad.className = "arcade-stick";
+    const cross = document.createElement("span");
+    cross.className = "stick-cross";
+    const knob = document.createElement("span");
+    knob.className = "stick-knob";
+    dpad.replaceChildren(cross, knob);
+    centerArcadeStick();
+    if (dpad.dataset.bound === "1") return;
+    dpad.dataset.bound = "1";
+    dpad.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      try { dpad.setPointerCapture(event.pointerId); } catch {}
+      updateArcadeStick(event);
+      try { navigator.vibrate?.(8); } catch {}
+    });
+    dpad.addEventListener("pointermove", event => {
+      if (pointerStates.get(event.pointerId)?.button === dpad) updateArcadeStick(event);
+    });
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+      dpad.addEventListener(type, event => {
+        releasePointer(event.pointerId);
+        centerArcadeStick();
+      });
+    }
+  }
+
+  function buildTouchControls'''
+              text, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise RuntimeError(f"build function replacements={count}")
+
+              release_target = '    touchControls.querySelectorAll(".is-pressed").forEach(button => button.classList.remove("is-pressed"));'
+              if release_target not in text:
+                  raise RuntimeError("release target missing")
+              text = text.replace(release_target, release_target + '\n    centerArcadeStick();', 1)
+
+              path.write_text(text, encoding="utf-8")
+              status = {"result": "success", "site_bytes": len(text.encode("utf-8"))}
+          except Exception as exc:
+              status = {"result": "failure", "error": str(exc), "traceback": traceback.format_exc()}
+
+          Path("arcade-upgrade-status.json").write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Commit patch result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/index.html arcade-upgrade-status.json
+          git commit -m "feat: apply arcade stick and convex button UI"
+          git push
