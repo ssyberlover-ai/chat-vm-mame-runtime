@@ -16,7 +16,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Remove conflicting fine-pointer override
+      - name: Replace overflowing portrait grid
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -24,10 +24,11 @@ jobs:
 
           path = Path("site/index.html")
           text = path.read_text(encoding="utf-8")
-          target = '@media(pointer:fine){#touch-controls{display:none!important}}\n'
+          target = "  body.touch-ui .touch-layout{min-height:260px}\n"
+          replacement = """  body.touch-ui .touch-layout{min-height:280px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto;gap:10px;align-items:center}\n  body.touch-ui .dpad{grid-column:1;grid-row:1;width:min(40vw,172px);justify-self:start}\n  body.touch-ui .action-pad{grid-column:2;grid-row:1;width:min(40vw,172px);justify-self:end}\n  body.touch-ui .action-pad .pad-key{width:clamp(58px,16vw,72px);height:clamp(58px,16vw,72px)}\n  body.touch-ui .system-pad{grid-column:1/-1;grid-row:2;flex-direction:row;justify-content:center;padding:2px 0 0}\n  body.touch-ui .system-pad .pad-key{width:72px;height:40px;min-height:40px}\n"""
           if target not in text:
-              raise SystemExit("Expected fine-pointer override was not found")
-          path.write_text(text.replace(target, "", 1), encoding="utf-8")
+              raise SystemExit("Expected portrait touch layout rule was not found")
+          path.write_text(text.replace(target, replacement, 1), encoding="utf-8")
           PY
 
       - name: Commit correction
@@ -36,5 +37,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/index.html
-          git commit -m "fix: keep touch controls visible on hybrid mobile pointers"
+          git commit -m "fix: fit portrait touch controls within mobile width"
           git push
