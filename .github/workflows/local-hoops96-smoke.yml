@@ -1,6 +1,6 @@
 name: Local Hoops 96 smoke test
 
-# Validates mobile controls, TEST initialization, RESET, and held COIN/START inputs.
+# Validates mobile controls, TEST initialization, RESET, and native MAME COIN/START keys.
 on:
   workflow_dispatch:
   push:
