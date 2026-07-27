@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-27T00:04:42.771025+00:00",
+  "policy": "Only ROMs with explicit redistribution licenses are mirrored here.",
+  "games": [
+    {
+      "id": "tobu-tobu-girl-deluxe",
+      "title": "Tobu Tobu Girl Deluxe",
+      "platform": "Game Boy",
+      "core": "gambatte",
+      "file": "tobu-tobu-girl-deluxe.gb",
+      "license": "MIT",
+      "developer": "Tangram Games",
+      "release_date": null,
+      "source_page": "https://hh.gbdev.io/game/tobutobugirldeluxe/",
+      "source_code": "https://github.com/SimonLarsen/tobutobugirl-dx",
+      "size_bytes": 262144,
+      "sha256": "0a0e8018dbbc8d7f8cd99f05e7cdc7b4cc9e358ecfe9377ebfb2291a84c6e310",
+      "url": "./roms/tobu-tobu-girl-deluxe.gb"
+    },
+    {
+      "id": "porklike-gb",
+      "title": "Porklike GB",
+      "platform": "Game Boy",
+      "core": "gambatte",
+      "file": "porklike-gb.gb",
+      "license": "MIT",
+      "developer": "Ben Smith (binji)",
+      "release_date": "2021-10-01",
+      "source_page": "https://hh.gbdev.io/game/porklike-gb/",
+      "source_code": "https://github.com/binji/porklike.gb",
+      "size_bytes": 65536,
+      "sha256": "d4ee86833a580c92aa789aef03407b90a6cc6eb27e70d3477c41c970d0cf3f11",
+      "url": "./roms/porklike-gb.gb"
+    },
+    {
+      "id": "5-mazes",
+      "title": "5 Mazes",
+      "platform": "Game Boy",
+      "core": "gambatte",
+      "file": "5-mazes.gb",
+      "license": "MIT",
+      "developer": "godai78",
+      "release_date": "2023-02-27",
+      "source_page": "https://hh.gbdev.io/game/5-mazes/",
+      "source_code": "https://github.com/godai78/5-Mazes",
+      "size_bytes": 262144,
+      "sha256": "4cb6a4a021056164dfad11ba041cb1c36d7453d2ebe6bb7fa9fe4b3eadbc4c60",
+      "url": "./roms/5-mazes.gb"
+    },
+    {
+      "id": "cybercoaster",
+      "title": "Cybercoaster",
+      "platform": "NES",
+      "core": "fceumm",
+      "file": "cybercoaster.nes",
+      "license": "CC-BY-4.0",
+      "developer": "Fizzer & noby",
+      "release_date": "2025-04-20",
+      "source_page": "https://hh.gbdev.io/game/cybercoaster/",
+      "source_code": null,
+      "size_bytes": 49168,
+      "sha256": "40a7631e1ae15b2120437f080b623ea23c11d475429d568f11d33b0f80e234b1",
+      "url": "./roms/cybercoaster.nes"
+    }
+  ]
+}
