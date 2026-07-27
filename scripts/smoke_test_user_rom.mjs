@@ -28,6 +28,8 @@ const result = {
   released_inputs: false,
   service_switch_sent: false,
   screen_changed_after_service: false,
+  service_exit_screen_changed: false,
+  coin_start_screen_changed: false,
   portrait_controls_separated: false,
   portrait_no_horizontal_overflow: false,
   portrait_controls_inside_viewport: false,
@@ -135,18 +137,36 @@ try {
   }
 
   const canvas = page.locator("#game canvas").last();
-  const before = await canvas.screenshot({ path: "smoke-hoops96-before-test.png" });
-  await page.locator("#touch-test").click();
+  const initial = await canvas.screenshot({ path: "smoke-hoops96-before-test.png" });
+  await page.locator("#touch-test").tap();
   await page.waitForTimeout(7000);
-  const after = await canvas.screenshot({ path: "smoke-hoops96.png" });
+  const serviceMenu = await canvas.screenshot({ path: "smoke-hoops96-service-menu.png" });
 
   result.service_switch_sent = await page.evaluate(() =>
     Number(window.touchControlDiagnostics?.serviceEvents || 0) > 0
   );
-  result.screen_changed_after_service = sha256(before) !== sha256(after);
+  result.screen_changed_after_service = sha256(initial) !== sha256(serviceMenu);
   if (!result.service_switch_sent) throw new Error("TEST control did not dispatch the service switch");
   if (!result.screen_changed_after_service) {
     throw new Error("Game canvas did not change after the TEST service switch");
+  }
+
+  await page.locator("#touch-test").tap();
+  await page.waitForTimeout(7000);
+  const afterServiceExit = await canvas.screenshot({ path: "smoke-hoops96-after-service-exit.png" });
+  result.service_exit_screen_changed = sha256(serviceMenu) !== sha256(afterServiceExit);
+  if (!result.service_exit_screen_changed) {
+    throw new Error("Game canvas did not change after exiting the service menu");
+  }
+
+  await page.locator("#touch-coin").tap();
+  await page.waitForTimeout(700);
+  await page.locator("#touch-start").tap();
+  await page.waitForTimeout(7000);
+  const afterCoinStart = await canvas.screenshot({ path: "smoke-hoops96-after-coin-start.png" });
+  result.coin_start_screen_changed = sha256(afterServiceExit) !== sha256(afterCoinStart);
+  if (!result.coin_start_screen_changed) {
+    throw new Error("Game canvas did not change after COIN and START inputs");
   }
 
   await page.screenshot({ path: "smoke-hoops96-landscape.png", fullPage: true });
