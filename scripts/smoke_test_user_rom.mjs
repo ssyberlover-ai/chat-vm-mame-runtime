@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 
-const targetUrl = process.env.SMOKE_URL || "https://ssyberlover-ai.github.io/chat-vm-mame-runtime/?game=hoops96-user";
+const targetUrl = process.env.SMOKE_URL || "http://127.0.0.1:8000/?game=hoops96-user&touch=1";
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
   viewport: { width: 900, height: 430 },
@@ -23,12 +23,17 @@ const result = {
   selected_core: null,
   canvas: false,
   controls: [],
+  control_profile: null,
+  concurrent_hold: false,
+  released_inputs: false,
   service_switch_sent: false,
   screen_changed_after_service: false,
   final_status: "",
   console: consoleLines,
   page_errors: pageErrors
 };
+
+const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 try {
   await page.goto(targetUrl, { waitUntil: "networkidle", timeout: 60000 });
@@ -46,7 +51,7 @@ try {
     return status.includes("실행 중") || status.includes("실행 실패") || error.length > 0;
   }, null, { timeout: 240000, polling: 500 });
 
-  await page.waitForTimeout(12000);
+  await page.waitForTimeout(9000);
   result.final_status = await page.locator("#status").textContent();
   const errorText = await page.locator("#error").textContent();
   if (errorText || result.final_status.includes("실행 실패")) {
@@ -64,7 +69,13 @@ try {
   const diagnostics = await page.evaluate(() => window.webEmulatorDiagnostics || null);
   result.selected_game = diagnostics?.id || null;
   result.selected_core = diagnostics?.core || null;
-  if (result.selected_game !== "hoops96-user" || result.selected_core !== "mame2003_plus") {
+  result.control_profile = diagnostics?.controlProfile || null;
+  if (
+    result.selected_game !== "hoops96-user" ||
+    result.selected_core !== "mame2003_plus" ||
+    result.control_profile !== "arcade" ||
+    !diagnostics?.customTouchControls
+  ) {
     throw new Error(`Unexpected runtime diagnostics: ${JSON.stringify(diagnostics)}`);
   }
 
@@ -75,33 +86,70 @@ try {
   );
   if (!result.canvas) throw new Error("MAME canvas was not detected");
 
-  const expected = ["FIRE", "FIRE 2", "COIN", "START"];
-  result.controls = await page.evaluate(labels => {
-    const visible = [...document.querySelectorAll("#game *")]
-      .filter(element => {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
-        return rect.width > 18 && rect.height > 18 &&
-          style.display !== "none" && style.visibility !== "hidden";
-      })
-      .map(element => (element.textContent || "").trim());
-    return labels.filter(label => visible.some(text => text === label || text.includes(label)));
-  }, expected);
-
-  if (!expected.every(label => result.controls.includes(label))) {
-    throw new Error(`Arcade controls were not all visible: ${JSON.stringify(result.controls)}`);
+  const expectedControls = [
+    ["#touch-b1", "B1"],
+    ["#touch-b2", "B2"],
+    ["#touch-b3", "B3"],
+    ["#touch-coin", "COIN"],
+    ["#touch-start", "START"],
+    ["#touch-test", "TEST"]
+  ];
+  for (const [selector, label] of expectedControls) {
+    const control = page.locator(selector);
+    if (!(await control.isVisible())) throw new Error(`${label} touch control is not visible`);
+    result.controls.push(label);
   }
 
-  const before = await page.screenshot({ path: "smoke-hoops96-before-test.png", fullPage: true });
-  await page.locator("#game canvas").last().click({ position: { x: 20, y: 20 } }).catch(() => {});
-  await page.keyboard.press("F2");
-  result.service_switch_sent = true;
-  await page.waitForTimeout(6000);
-  const after = await page.screenshot({ path: "smoke-hoops96.png", fullPage: true });
+  const pointerEvent = (pointerId, pointerType = "touch") => ({
+    pointerId,
+    pointerType,
+    isPrimary: pointerId === 41,
+    buttons: 1,
+    button: 0,
+    clientX: 10,
+    clientY: 10
+  });
+
+  await page.dispatchEvent("#touch-dir-5", "pointerdown", pointerEvent(41));
+  await page.dispatchEvent("#touch-b1", "pointerdown", pointerEvent(42));
+  await sleep(350);
+
+  let inputEvents = await page.evaluate(() => window.touchControlDiagnostics?.events || []);
+  result.concurrent_hold = inputEvents.some(event => event.index === 7 && event.value === 1) &&
+    inputEvents.some(event => event.index === 0 && event.value === 1);
+  if (!result.concurrent_hold) {
+    throw new Error(`Concurrent direction/action hold was not recorded: ${JSON.stringify(inputEvents)}`);
+  }
+
+  await page.dispatchEvent("#touch-dir-5", "pointerup", { ...pointerEvent(41), buttons: 0 });
+  await page.dispatchEvent("#touch-b1", "pointerup", { ...pointerEvent(42), buttons: 0 });
+  await sleep(250);
+  inputEvents = await page.evaluate(() => window.touchControlDiagnostics?.events || []);
+  result.released_inputs = inputEvents.some(event => event.index === 7 && event.value === 0) &&
+    inputEvents.some(event => event.index === 0 && event.value === 0);
+  if (!result.released_inputs) {
+    throw new Error(`Released inputs were not recorded: ${JSON.stringify(inputEvents)}`);
+  }
+
+  const canvas = page.locator("#game canvas").last();
+  const before = await canvas.screenshot({ path: "smoke-hoops96-before-test.png" });
+  await page.locator("#touch-test").click();
+  await page.waitForTimeout(7000);
+  const after = await canvas.screenshot({ path: "smoke-hoops96.png" });
+
+  result.service_switch_sent = await page.evaluate(() =>
+    Number(window.touchControlDiagnostics?.serviceEvents || 0) > 0
+  );
   result.screen_changed_after_service = sha256(before) !== sha256(after);
+  if (!result.service_switch_sent) throw new Error("TEST control did not dispatch the service switch");
+  if (!result.screen_changed_after_service) {
+    throw new Error("Game canvas did not change after the TEST service switch");
+  }
 
   const fatalErrors = pageErrors.filter(message => !/Wake Lock permission request denied/i.test(message));
   if (fatalErrors.length) throw new Error(`Browser errors:\n${fatalErrors.join("\n\n")}`);
+
+  await page.screenshot({ path: "smoke-hoops96-full.png", fullPage: true });
 } catch (error) {
   result.error = error.stack || String(error);
   await page.screenshot({ path: "smoke-hoops96-failure.png", fullPage: true }).catch(() => {});
