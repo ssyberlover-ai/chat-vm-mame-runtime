@@ -1,6 +1,6 @@
 name: Local Hoops 96 smoke test
 
-# Validates mobile controls, TEST initialization, RESET, and gameplay start.
+# Validates mobile controls, TEST initialization, RESET, and held COIN/START inputs.
 on:
   workflow_dispatch:
   push:
@@ -61,7 +61,8 @@ jobs:
             smoke-hoops96-before-test.png
             smoke-hoops96-service-menu.png
             smoke-hoops96-after-reset.png
-            smoke-hoops96-after-coin-start.png
+            smoke-hoops96-after-coin.png
+            smoke-hoops96-after-start.png
             smoke-hoops96-landscape.png
             smoke-hoops96-portrait.png
             smoke-hoops96-failure.png
